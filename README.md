@@ -98,11 +98,12 @@ scenario.
 
 ## Usage
 
-`smoke.html` imports all seven suite bundles, exercises each counter, and
-mounts all 42 additive suites (`6 × 7`). It verifies accordion, checkbox, and
-tabs interaction in every implementation. The visible fixtures apply consumer
-Tailwind classes while component modules remain unstyled. A controlled
-`<vanilla-counter value="5">` demonstrates consumer-authoritative updates.
+`smoke.html` imports eight counter bundles, exercises the seven complete counters
+and the manual customized built-in hosts, and mounts all 42 additive suites
+(`6 × 7`). It verifies accordion, checkbox, and tabs interaction in every suite
+implementation. The visible fixtures apply consumer Tailwind classes while
+component modules remain unstyled. A controlled `<vanilla-counter value="5">`
+demonstrates consumer-authoritative updates.
 
 Direct browser scripts:
 
@@ -111,6 +112,10 @@ Direct browser scripts:
 <script
   type="module"
   src="./packages/web-components-vanilla-optimized/dist/optimized-counter.js"
+></script>
+<script
+  type="module"
+  src="./packages/web-components-vanilla-optimized-manual/dist/optimized-counter.js"
 ></script>
 <script type="module" src="./packages/web-components-solidjs/dist/solid-counter.js"></script>
 <script type="module" src="./packages/web-components-atomico/dist/atomico-counter.js"></script>
@@ -130,6 +135,7 @@ Package module imports:
 ```js
 import "@webcomponents/vanilla-counter";
 import "@webcomponents/vanilla-optimized-counter";
+import "@webcomponents/vanilla-optimized-manual-counter";
 import "@webcomponents/solid-counter";
 import "@webcomponents/atomico-counter";
 import "@webcomponents/preact-counter";
@@ -141,6 +147,7 @@ import "@webcomponents/svelte-counter";
 | ------------------------------------------ | ---------------------------------- | ------------ | --------------------------------------------------------------------- |
 | `@webcomponents/vanilla-counter`           | `<vanilla-counter>` family         | `vanilla-*`  | `packages/web-components-vanilla/dist/vanilla-counter.js`             |
 | `@webcomponents/vanilla-optimized-counter` | `<o-c>`, `<o-m>`, `<o-l>`, `<o-p>` | `o-*`        | `packages/web-components-vanilla-optimized/dist/optimized-counter.js` |
+| `@webcomponents/vanilla-optimized-manual-counter` | `<manually-optimized-counter>` with customized built-in controls | — | `packages/web-components-vanilla-optimized-manual/dist/optimized-counter.js` |
 | `@webcomponents/solid-counter`             | `<solid-counter>` family           | `solid-*`    | `packages/web-components-solidjs/dist/solid-counter.js`               |
 | `@webcomponents/atomico-counter`           | `<atomico-counter>` family         | `atomico-*`  | `packages/web-components-atomico/dist/atomico-counter.js`             |
 | `@webcomponents/preact-counter`            | `<preact-counter>` family          | `preact-*`   | `packages/web-components-preact/dist/preact-counter.js`               |

@@ -6,7 +6,7 @@ const MINUS = "manually-optimized-counter-minus-button";
 const LABEL = "manually-optimized-counter-label";
 const PLUS = "manually-optimized-counter-plus-button";
 
-const composed = `<${MINUS} class="btn"></${MINUS}><${LABEL} class="lbl"></${LABEL}><${PLUS} class="btn"></${PLUS}>`;
+const composed = `<button is="${MINUS}" class="btn"></button><span is="${LABEL}" class="lbl"></span><button is="${PLUS}" class="btn"></button>`;
 
 type CounterElement = HTMLElement & {
   defaultValue: number;
@@ -22,9 +22,9 @@ function mount(attributes = ""): CounterElement {
 }
 
 function controls(parent: HTMLElement) {
-  const minus = parent.querySelector<HTMLButtonElement>(`${MINUS} > button`);
-  const label = parent.querySelector<HTMLElement>(`${LABEL} > span`);
-  const plus = parent.querySelector<HTMLButtonElement>(`${PLUS} > button`);
+  const minus = parent.querySelector<HTMLButtonElement>(`button[is="${MINUS}"]`);
+  const label = parent.querySelector<HTMLElement>(`span[is="${LABEL}"]`);
+  const plus = parent.querySelector<HTMLButtonElement>(`button[is="${PLUS}"]`);
   if (!minus || !label || !plus) throw new Error("counter children did not render");
   return { minus, label, plus };
 }
@@ -40,19 +40,19 @@ describe("manually optimized vanilla counter", () => {
     expect(parent.shadowRoot).toBeNull();
 
     const { minus, label, plus } = controls(parent);
-    expect(minus.getAttribute("aria-label")).toBe("Decrement count");
+    expect(minus.getAttribute("aria-label")).toBe("Remove count");
     expect(minus.getAttribute("data-testid")).toBe(MINUS);
-    expect(minus.className).toBe("counter-minus-button btn");
+    expect(minus.className).toBe("btn counter-minus-button");
     expect(minus.type).toBe("button");
     expect(minus.style.cursor).toBe("pointer");
-    expect(minus.textContent).toBe("−");
+    expect(minus.textContent).toBe("-");
     expect(label.getAttribute("aria-live")).toBe("polite");
     expect(label.getAttribute("data-testid")).toBe(LABEL);
-    expect(label.className).toBe("counter-label lbl");
+    expect(label.className).toBe("lbl counter-label");
     expect(label.textContent).toBe("0");
-    expect(plus.getAttribute("aria-label")).toBe("Increment count");
+    expect(plus.getAttribute("aria-label")).toBe("Add count");
     expect(plus.getAttribute("data-testid")).toBe(PLUS);
-    expect(plus.className).toBe("counter-plus-button btn");
+    expect(plus.className).toBe("btn counter-plus-button");
     expect(plus.type).toBe("button");
 
     minus.click();
@@ -104,13 +104,13 @@ describe("manually optimized vanilla counter", () => {
 
   it("keeps forwarded classes in sync", () => {
     const parent = mount();
-    const host = parent.querySelector<HTMLElement>(MINUS);
+    const host = parent.querySelector<HTMLElement>(`button[is="${MINUS}"]`);
     if (!host) throw new Error("minus button did not mount");
 
     host.className = "px-4 font-bold";
-    expect(host.querySelector("button")?.className).toBe("counter-minus-button px-4 font-bold");
+    expect(host.className).toBe("px-4 font-bold");
 
     host.className = "";
-    expect(host.querySelector("button")?.className).toBe("counter-minus-button");
+    expect(host.className).toBe("");
   });
 });

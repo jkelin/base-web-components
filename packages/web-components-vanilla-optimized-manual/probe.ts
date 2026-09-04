@@ -5,12 +5,13 @@ Object.assign(globalThis, {
   document: window.document,
   HTMLElement: window.HTMLElement,
   HTMLButtonElement: window.HTMLButtonElement,
+  HTMLSpanElement: window.HTMLSpanElement,
   Element: window.Element,
   CustomEvent: window.CustomEvent,
 });
 // Globals must be installed before the custom-element module evaluates.
 await import("./src/index");
-document.body.innerHTML = `<manually-optimized-counter default-value="5"><manually-optimized-counter-minus-button class="btn"></manually-optimized-counter-minus-button><manually-optimized-counter-label class="lbl"></manually-optimized-counter-label><manually-optimized-counter-plus-button class="btn"></manually-optimized-counter-plus-button></manually-optimized-counter>`;
+document.body.innerHTML = `<manually-optimized-counter default-value="5"><button is="manually-optimized-counter-minus-button" class="btn"></button><span is="manually-optimized-counter-label" class="lbl"></span><button is="manually-optimized-counter-plus-button" class="btn"></button></manually-optimized-counter>`;
 const host = document.querySelector("manually-optimized-counter")!;
 const buttons = host.querySelectorAll("button");
 const label = host.querySelector("span")!;

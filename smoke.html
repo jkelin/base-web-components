@@ -197,6 +197,36 @@
             ></o-p>
           </o-c>
         </section>
+        <section class="grid gap-2 sm:grid-cols-[8rem_1fr] sm:items-center">
+          <h2 class="select-none font-semibold text-slate-700">
+            Vanilla optimized manual
+          </h2>
+          <manually-optimized-counter
+            id="smoke-manual-counter"
+            class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+            data-testid="smoke-manual-counter"
+          >
+            <button
+              is="manually-optimized-counter-minus-button"
+              id="smoke-manual-minus-button"
+              class="cursor-pointer rounded-lg bg-slate-900 px-3 py-1 text-white transition hover:bg-slate-700"
+              data-testid="smoke-manual-minus-button"
+            ></button>
+            <manually-optimized-counter-label
+              is="manually-optimized-counter-label"
+              id="smoke-manual-label"
+              class="min-w-8 text-center font-mono text-lg"
+              data-testid="smoke-manual-label"
+            ></manually-optimized-counter-label>
+            <button
+              is="manually-optimized-counter-plus-button"
+              id="smoke-manual-plus-button"
+              class="cursor-pointer rounded-lg bg-slate-900 px-3 py-1 text-white transition hover:bg-slate-700"
+              data-testid="smoke-manual-plus-button"
+            ></button>
+          </manually-optimized-counter>
+        </section>
+
       </div>
 
       <section class="grid gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
@@ -272,6 +302,7 @@
       import "./packages/web-components-lit/dist/lit-counter.js";
       import "./packages/web-components-svelte/dist/svelte-counter.js";
       import "./packages/web-components-vanilla-optimized/dist/optimized-counter.js";
+      import "./packages/web-components-vanilla-optimized-manual/dist/optimized-counter.js";
 
       const controlledCounter = document.querySelector("#controlled-vanilla-counter");
       const controlledValue = document.querySelector("#controlled-value");
@@ -358,6 +389,47 @@
           `${counterTag}-plus-button`,
         ]);
       }
+      async function exerciseManual() {
+        const names = {
+          minus: "manually-optimized-counter-minus-button",
+          label: "manually-optimized-counter-label",
+          plus: "manually-optimized-counter-plus-button",
+        };
+        await Promise.all(
+          Object.values(names).map((name) => customElements.whenDefined(name)),
+        );
+
+        const minus = document.querySelector("#smoke-manual-minus-button");
+        const label = document.querySelector("#smoke-manual-label");
+        const plus = document.querySelector("#smoke-manual-plus-button");
+        if (!minus || !label || !plus) {
+          throw new Error("manual smoke fixture is incomplete");
+        }
+
+
+        await waitFor(
+          () => minus.getAttribute("aria-label"),
+          "Remove count",
+          "manual minus-button upgrade",
+        );
+        await waitFor(
+          () => minus.dataset.testid,
+          "smoke-manual-minus-button",
+          "manual consumer test id",
+        );
+        await waitFor(() => minus.textContent, "-", "manual minus-button content");
+        await waitFor(() => label.getAttribute("aria-live"), "polite", "manual label upgrade");
+        await waitFor(
+          () => plus.getAttribute("aria-label"),
+          "Add count",
+          "manual plus-button upgrade",
+        );
+        await waitFor(() => plus.textContent, "+", "manual plus-button content");
+
+        if (minus.children.length || label.children.length || plus.children.length) {
+          throw new Error("manual controls rendered nested elements");
+        }
+      }
 
       async function exerciseSuites(prefix) {
         const card = document.createElement("article");
@@ -417,11 +489,12 @@
           await exercise(prefix);
         }
         await exerciseTags(["o-c", "o-m", "o-l", "o-p"]);
+        await exerciseManual();
         for (const prefix of ["vanilla", "o", "solid", "atomico", "preact", "lit", "svelte"]) {
           await exerciseSuites(prefix);
         }
 
-        result.value = "PASS: counters plus 42 light-DOM suites work";
+        result.value = "PASS: counters, manual built-in hosts, and 42 light-DOM suites work";
         result.classList.remove("text-slate-700");
         result.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
         result.dataset.status = "pass";

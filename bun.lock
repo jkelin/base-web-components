@@ -101,6 +101,9 @@
     "packages/web-components-vanilla-optimized-manual": {
       "name": "@webcomponents/vanilla-optimized-manual-counter",
       "version": "1.0.0",
+      "dependencies": {
+        "alien-signals": "^3.2.1",
+      },
       "devDependencies": {
         "happy-dom": "^20.12.0",
         "typescript": "^6.0.3",
@@ -331,6 +334,8 @@
     "@webcomponents/vanilla-optimized-manual-counter": ["@webcomponents/vanilla-optimized-manual-counter@workspace:packages/web-components-vanilla-optimized-manual"],
 
     "acorn": ["acorn@8.18.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ=="],
+
+    "alien-signals": ["alien-signals@3.2.1", "", {}, "sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g=="],
 
     "aria-query": ["aria-query@5.3.1", "", {}, "sha512-Z/ZeOgVl7bcSYZ/u/rh0fOpvEpq//LZmdbkXyc7syVzjPAhfOa9ebsdTSjEBDU4vs5nC98Kfduj1uFo0qyET3g=="],
 

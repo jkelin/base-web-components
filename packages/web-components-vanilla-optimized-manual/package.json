@@ -1,7 +1,7 @@
 {
   "name": "@webcomponents/vanilla-optimized-manual-counter",
   "version": "1.0.0",
-  "description": "A size-optimized zero-dependency vanilla counter custom element.",
+  "description": "A size-optimized vanilla counter custom element.",
   "files": [
     "dist"
   ],
@@ -24,6 +24,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src tests",
     "format": "oxfmt --write src tests"
+  },
+  "dependencies": {
+    "alien-signals": "^3.2.1"
   },
   "devDependencies": {
     "happy-dom": "^20.12.0",
