@@ -1,0 +1,51 @@
+{
+  "name": "@webcomponents/preact-counter",
+  "version": "1.0.0",
+  "description": "A standalone compound Preact counter custom element.",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/counter.ts",
+    "./src/counter-minus-button.ts",
+    "./src/counter-label.ts",
+    "./src/counter-plus-button.ts",
+    "./src/components.ts",
+    "./src/accordion.ts",
+    "./src/modal.ts",
+    "./src/popover.ts",
+    "./src/toggle-checkbox.ts",
+    "./src/otp-field.ts",
+    "./src/tabs.ts",
+    "./dist/preact-counter.js"
+  ],
+  "main": "./dist/preact-counter.js",
+  "module": "./dist/preact-counter.js",
+  "exports": {
+    ".": {
+      "import": "./dist/preact-counter.js",
+      "default": "./dist/preact-counter.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src tests",
+    "format": "oxfmt --write src tests"
+  },
+  "dependencies": {
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.12.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}

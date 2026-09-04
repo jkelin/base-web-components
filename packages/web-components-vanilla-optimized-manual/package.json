@@ -1,0 +1,37 @@
+{
+  "name": "@webcomponents/vanilla-optimized-manual-counter",
+  "version": "1.0.0",
+  "description": "A size-optimized zero-dependency vanilla counter custom element.",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/index.ts",
+    "./dist/optimized-counter.js"
+  ],
+  "main": "./dist/optimized-counter.js",
+  "module": "./dist/optimized-counter.js",
+  "exports": {
+    ".": {
+      "import": "./dist/optimized-counter.js",
+      "default": "./dist/optimized-counter.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src tests",
+    "format": "oxfmt --write src tests"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.12.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}

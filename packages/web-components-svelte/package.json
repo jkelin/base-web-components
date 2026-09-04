@@ -1,0 +1,63 @@
+{
+  "name": "@webcomponents/svelte-counter",
+  "version": "1.0.0",
+  "description": "A standalone Svelte compound counter custom element.",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/Counter.svelte",
+    "./src/CounterMinusButton.svelte",
+    "./src/CounterLabel.svelte",
+    "./src/CounterPlusButton.svelte",
+    "./src/components.ts",
+    "./src/Accordion.svelte",
+    "./src/AccordionItem.svelte",
+    "./src/AccordionTrigger.svelte",
+    "./src/AccordionPanel.svelte",
+    "./src/Modal.svelte",
+    "./src/ModalTrigger.svelte",
+    "./src/ModalPopup.svelte",
+    "./src/ModalClose.svelte",
+    "./src/Popover.svelte",
+    "./src/PopoverTrigger.svelte",
+    "./src/PopoverPopup.svelte",
+    "./src/PopoverClose.svelte",
+    "./src/ToggleCheckbox.svelte",
+    "./src/OtpField.svelte",
+    "./src/Tabs.svelte",
+    "./src/TabsList.svelte",
+    "./src/Tab.svelte",
+    "./src/TabPanel.svelte",
+    "./dist/svelte-counter.js"
+  ],
+  "main": "./dist/svelte-counter.js",
+  "module": "./dist/svelte-counter.js",
+  "exports": {
+    ".": {
+      "import": "./dist/svelte-counter.js",
+      "default": "./dist/svelte-counter.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "lint": "oxlint src tests",
+    "format": "oxfmt --write src tests"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "happy-dom": "^20.12.0",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}
