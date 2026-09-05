@@ -4,17 +4,8 @@ export type PropSignal = {
   (): string | null;
   (value: string | null): void;
 };
-type Prop = {
-  name: string;
-  value: PropSignal;
-  attribute: string | null;
-  dispose?: () => void;
-};
-type PropContext = {
-  host: HTMLElement;
-  props: Map<string, Prop>;
-  observer?: MutationObserver;
-};
+type Prop = [value: PropSignal, attribute: string | null, dispose?: () => void];
+type PropContext = [host: HTMLElement, props: Map<string, Prop>, observer?: MutationObserver];
 
 export type PropRender<Result> = {
   result: Result;
@@ -31,44 +22,42 @@ function validate(value: unknown): asserts value is string | null {
 }
 
 function reconcile(context: PropContext): void {
-  for (const prop of context.props.values()) {
-    const attribute = context.host.getAttribute(prop.name);
-    if (attribute !== prop.attribute) {
-      prop.attribute = attribute;
-      prop.value(attribute);
+  for (const [name, prop] of context[1]) {
+    const attribute = context[0].getAttribute(name);
+    if (attribute !== prop[1]) {
+      prop[1] = attribute;
+      prop[0](attribute);
     }
   }
 }
 
 function start(context: PropContext): void {
-  if (context.props.size === 0) {
+  if (context[1].size === 0) {
     return;
   }
 
   try {
     reconcile(context);
-    for (const prop of context.props.values()) {
-      validate(prop.value());
-      prop.dispose = effect(() => {
-        const next = prop.value();
+    for (const [name, prop] of context[1]) {
+      prop[2] = effect(() => {
+        const next = prop[0]();
         validate(next);
-        if (context.host.getAttribute(prop.name) !== next) {
+        if (context[0].getAttribute(name) !== next) {
           if (next === null) {
-            context.host.removeAttribute(prop.name);
+            context[0].removeAttribute(name);
           } else {
-            context.host.setAttribute(prop.name, next);
+            context[0].setAttribute(name, next);
           }
         }
-        prop.attribute = next;
+        prop[1] = next;
       });
     }
 
     const observer = new MutationObserver(() => reconcile(context));
-    observer.observe(context.host, {
-      attributes: true,
-      attributeFilter: Array.from(context.props.keys()),
+    observer.observe(context[0], {
+      attributeFilter: [...context[1].keys()],
     });
-    context.observer = observer;
+    context[2] = observer;
   } catch (error) {
     stop(context);
     throw error;
@@ -76,11 +65,11 @@ function start(context: PropContext): void {
 }
 
 function stop(context: PropContext): void {
-  context.observer?.disconnect();
-  delete context.observer;
-  for (const prop of context.props.values()) {
-    prop.dispose?.();
-    delete prop.dispose;
+  context[2]?.disconnect();
+  delete context[2];
+  for (const prop of context[1].values()) {
+    prop[2]?.();
+    delete prop[2];
   }
   reconcile(context);
 }
@@ -91,7 +80,7 @@ export function renderWithProps<Result>(
   render: () => Result,
 ): PropRender<Result> {
   const previousContext = currentContext;
-  const context: PropContext = { host, props: new Map() };
+  const context: PropContext = [host, new Map()];
   currentContext = context;
 
   try {
@@ -99,7 +88,7 @@ export function renderWithProps<Result>(
     return {
       result,
       reconnect: () => {
-        if (context.observer) {
+        if (context[2]) {
           reconcile(context);
         } else {
           start(context);
@@ -125,22 +114,23 @@ export function useProp(name: string): PropSignal {
     throw new TypeError("Invalid prop name.");
   }
 
-  const existing = context.props.get(name);
+  const existing = context[1].get(name);
   if (existing) {
-    return existing.value;
+    return existing[0];
   }
 
-  const { host } = context;
+  const host = context[0];
   const descriptor = Object.getOwnPropertyDescriptor(host, name);
   if (descriptor && (!descriptor.configurable || !("value" in descriptor))) {
     throw new TypeError("Prop cannot be replaced.");
   }
-  const initial: unknown = descriptor ? descriptor.value : host.getAttribute(name);
+  const attribute = host.getAttribute(name);
+  const initial: unknown = descriptor ? descriptor.value : attribute;
   validate(initial);
 
   const value = signal<string | null>(initial);
-  const prop: Prop = { name, value, attribute: host.getAttribute(name) };
-  context.props.set(name, prop);
+  const prop: Prop = [value, attribute];
+  context[1].set(name, prop);
   Object.defineProperty(host, name, {
     configurable: true,
     enumerable: true,

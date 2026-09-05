@@ -4,24 +4,8 @@ export type HtmlPrimitive = string | number | boolean | null | undefined;
 
 export type HtmlValue = HtmlPrimitive | EventListener | (() => HtmlPrimitive);
 
-export type TemplateBinding =
-  | {
-      index: number;
-      set: (value: HtmlPrimitive) => void;
-    }
-  | {
-      index: number;
-      install: (value: HtmlValue) => () => void;
-    };
-
-// Boolean attributes use presence semantics; nullish and false values remove them.
-function setAttributeValue(node: Element, name: string, value: HtmlPrimitive): void {
-  if (value === false || value === null || value === undefined) {
-    node.removeAttribute(name);
-  } else {
-    node.setAttribute(name, value === true ? "" : String(value));
-  }
-}
+// Setup bindings encode the interpolation index as its bitwise complement.
+export type TemplateBinding = [index: number, apply: (value: HtmlValue) => void | (() => void)];
 
 function markerIndex(text: string, valueCount: number): number {
   const index = Number(text);
@@ -63,16 +47,15 @@ export function extractAttributeBindings(
         if (!directive) {
           throw new Error("Invalid field binding.");
         }
-
         const eventName = directive[1]!;
         const fieldName = directive[2]!;
         if (!(fieldName in node)) {
           throw new Error("Unknown bound field.");
         }
 
-        bindings.push({
-          index,
-          install: (value) => {
+        bindings.push([
+          ~index,
+          (value) => {
             if (typeof value !== "function" || !isSignal(value as () => void)) {
               throw new TypeError("Expected writable signal.");
             }
@@ -83,27 +66,25 @@ export function extractAttributeBindings(
               if (
                 fieldValue !== null &&
                 fieldValue !== undefined &&
-                typeof fieldValue !== "string" &&
-                typeof fieldValue !== "number" &&
-                typeof fieldValue !== "boolean"
+                !"string number boolean".includes(typeof fieldValue)
               ) {
                 throw new TypeError("Bound field must be primitive.");
               }
-              (value as (next: HtmlPrimitive) => void)(fieldValue);
+              (value as (next: HtmlPrimitive) => void)(fieldValue as HtmlPrimitive);
             };
 
             // Capture precedes normal on-event handlers regardless of registration order.
             node.addEventListener(eventName, updateSignal, true);
             return () => node.removeEventListener(eventName, updateSignal, true);
           },
-        });
+        ]);
         continue;
       }
 
       if (attributeName.startsWith("on")) {
-        bindings.push({
-          index,
-          install: (value) => {
+        bindings.push([
+          ~index,
+          (value) => {
             if (value !== null && (typeof value !== "function" || isSignal(value as () => void))) {
               throw new TypeError("Expected event handler.");
             }
@@ -112,12 +93,18 @@ export function extractAttributeBindings(
               (node as unknown as Record<string, unknown>)[attributeName] = null;
             };
           },
-        });
+        ]);
       } else {
-        bindings.push({
+        bindings.push([
           index,
-          set: (value) => setAttributeValue(node, attributeName, value),
-        });
+          (value) => {
+            if (value === false || value === null || value === undefined) {
+              node.removeAttribute(attributeName);
+            } else {
+              node.setAttribute(attributeName, value === true ? "" : String(value));
+            }
+          },
+        ]);
       }
     }
   }
@@ -150,12 +137,12 @@ export function extractTextBindings(
       replacement.append(text.slice(textOffset, match.index));
       const valueNode = document.createTextNode("");
       replacement.append(valueNode);
-      bindings.push({
-        index: markerIndex(match[1]!, valueCount),
-        set: (value) => {
-          valueNode.data = value === null || value === undefined ? "" : String(value);
+      bindings.push([
+        markerIndex(match[1]!, valueCount),
+        (value) => {
+          valueNode.data = String(value ?? "");
         },
-      });
+      ]);
       textOffset = match.index + match[0].length;
     } while ((match = markerPattern.exec(text)));
 
@@ -177,26 +164,30 @@ export function bindTemplateBindings(bindings: TemplateBinding[], values: HtmlVa
   };
 
   try {
-    for (const binding of bindings) {
-      if (!(binding.index in values)) {
+    for (let [index, apply] of bindings) {
+      const install = index < 0;
+      if (install) {
+        index = ~index;
+      }
+      if (!(index in values)) {
         throw new Error("Missing interpolation.");
       }
 
-      const value = values[binding.index];
-      if ("install" in binding) {
-        cleanup.push(binding.install(value));
+      const value = values[index];
+      if (install) {
+        cleanup.push(apply(value) as () => void);
       } else if (typeof value === "function" && isSignal(value as () => void)) {
         rejectHandler((value as () => unknown)());
         cleanup.push(
           effect(() => {
             const next = (value as () => unknown)();
             rejectHandler(next);
-            binding.set(next);
+            apply(next);
           }),
         );
       } else {
         rejectHandler(value);
-        binding.set(value);
+        apply(value);
       }
     }
   } catch (error) {

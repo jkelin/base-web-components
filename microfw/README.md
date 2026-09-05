@@ -10,7 +10,18 @@ Small reactive Web Component runtime.
 - `html`
 - `useProp`
 
-`bun run build` writes the importable runtime to `dist/microfw.js`. The file includes the required Alien Signals runtime and excludes `src/example.ts`.
+## Build output
+
+`bun run build` emits one ES2022 module, `dist/microfw.js` (raw 8,329 B;
+gzip-9 3,361 B; Brotli-11 3,043 B; measured with Bun 1.4.0 / Vite 8.2.2). It bundles the required Alien Signals
+runtime, uses native Rolldown full minification, and excludes
+`src/example.ts`. Public exports stay `defineComponent`, `html`, `useProp`;
+nothing is externalized or split into chunks.
+
+Size notes: prop/context records and template bindings are fixed tuples;
+template markers are short numeric ids with a collision scan; reserved-slot
+classes copy with one variadic `classList.add`. Disconnect clears template
+bindings explicitly (`#unbind = undefined`) before disposing prop effects.
 
 ## Commands
 

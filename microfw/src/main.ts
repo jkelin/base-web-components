@@ -43,9 +43,7 @@ export function defineComponent(
         const propertySlot = this.#propertySlot;
         if (propertySlot) {
           this.#propertySlot = null;
-          for (const className of propertySlot.classList) {
-            this.classList.add(className);
-          }
+          this.classList.add(...propertySlot.classList);
           for (const attribute of propertySlot.attributes) {
             if (attribute.name !== "name" && !this.hasAttribute(attribute.name)) {
               this.setAttribute(attribute.name, attribute.value);
@@ -78,7 +76,7 @@ export function defineComponent(
 export function html(template: TemplateStringsArray, ...values: HtmlValue[]): HtmlTemplate {
   let marker: string;
   do {
-    marker = `microfw:${templateId++}:`;
+    marker = `${templateId++}:`;
   } while (template.some((part) => part.includes(marker)));
 
   let markup = template[0]!;
