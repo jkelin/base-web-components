@@ -7,6 +7,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "build": "vite build",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
     "format": "oxfmt --write src"
@@ -15,7 +16,9 @@
     "alien-signals": "^3.2.1"
   },
   "devDependencies": {
+    "happy-dom": "^20.12.0",
     "typescript": "^6.0.3",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.10"
   }
 }
