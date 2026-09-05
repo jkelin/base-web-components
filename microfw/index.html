@@ -1,9 +1,13 @@
 <html>
   <body>
 
-    <p is="my-paragraph" class="c2">wqeqwe 1</p>
+    <p id="prop-showcase" data-testid="prop-showcase" is="my-paragraph" class="c2" label="Initial attribute">wqeqwe 1</p>
 
-    <p is="my-paragraph" class="c2">wqeqwe 2</p>
+    <p is="my-paragraph" data-testid="prop-showcase-sibling" class="c2" label="Independent instance">wqeqwe 2</p>
+
+    <button id="set-label-property" data-testid="set-label-property">Set label property</button>
+    <button id="set-label-attribute" data-testid="set-label-attribute">Set label attribute</button>
+    <button id="remove-label-attribute" data-testid="remove-label-attribute">Remove label attribute</button>
 
     <style>
       .c2 {
@@ -12,6 +16,8 @@
       p {
         font-weight: bold;
       }
+      button { cursor: pointer; }
+      button:disabled { cursor: not-allowed; }
     </style>
 
     <script type="module" src="/src/main.ts"></script>

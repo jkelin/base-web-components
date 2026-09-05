@@ -1,13 +1,16 @@
-import { isSignal } from "alien-signals";
+import { effect, effectScope, isSignal } from "alien-signals";
 
 export const interpolationMarkerPrefix = "microfw:";
 
 export type HtmlPrimitive = string | number | boolean | null | undefined;
 
+export type HtmlValue = HtmlPrimitive | EventListener | (() => HtmlPrimitive);
+
 export type TemplateBinding = {
   index: number;
   isEventHandler: boolean;
   set: (value: HtmlPrimitive | EventListener) => void;
+  bindSignal?: (value: HtmlValue) => () => void;
 };
 
 // Boolean attributes use presence semantics; nullish and false values remove them.
@@ -37,6 +40,52 @@ export function extractAttributeBindings(root: ParentNode, valueCount: number): 
       }
 
       node.removeAttribute(attribute.name);
+      if (attribute.name.startsWith("bind:")) {
+        const directive = /^bind:on([^:]+):([^:]+)$/.exec(attribute.name);
+        if (!directive) {
+          throw new Error(`Invalid event field binding "${attribute.name}".`);
+        }
+
+        const eventName = directive[1]!;
+        const fieldName = directive[2]!;
+        if (!(fieldName in node)) {
+          throw new Error(`Unknown bound field "${fieldName}".`);
+        }
+
+        bindings.push({
+          index,
+          isEventHandler: false,
+          set: () => {
+            throw new TypeError("Event field bindings require a writable signal.");
+          },
+          bindSignal: (value) => {
+            if (typeof value !== "function" || !isSignal(value as () => void)) {
+              throw new TypeError("Event field bindings require a writable signal.");
+            }
+
+            // Read the bound node, not a bubbling event's potentially different target.
+            const updateSignal = () => {
+              const fieldValue: unknown = Reflect.get(node, fieldName);
+              if (
+                fieldValue !== null &&
+                fieldValue !== undefined &&
+                typeof fieldValue !== "string" &&
+                typeof fieldValue !== "number" &&
+                typeof fieldValue !== "boolean"
+              ) {
+                throw new TypeError(`Bound field "${fieldName}" must contain a primitive value.`);
+              }
+
+              (value as (next: HtmlPrimitive) => void)(fieldValue);
+            };
+
+            // Capture precedes normal on-event handlers regardless of registration order.
+            node.addEventListener(eventName, updateSignal, true);
+            return () => node.removeEventListener(eventName, updateSignal, true);
+          },
+        });
+        continue;
+      }
       const isEventHandler = attribute.name.startsWith("on");
       bindings.push({
         index,
@@ -121,4 +170,50 @@ export function extractTextBindings(root: Node, valueCount: number): TemplateBin
   }
 
   return bindings;
+}
+
+// Failed setup rolls back listeners and effects; disposal is safe before reconnecting.
+export function bindTemplateBindings(bindings: TemplateBinding[], values: HtmlValue[]): () => void {
+  const cleanup: (() => void)[] = [];
+  let setupError: unknown;
+  let setupFailed = false;
+  const disposeEffects = effectScope(() => {
+    try {
+      for (const binding of bindings) {
+        if (!(binding.index in values)) {
+          throw new Error(`Missing template value at index ${binding.index}.`);
+        }
+
+        const value = values[binding.index];
+        if (binding.bindSignal) {
+          cleanup.push(binding.bindSignal(value));
+        } else if (binding.isEventHandler) {
+          binding.set(value as HtmlPrimitive | EventListener);
+          cleanup.push(() => binding.set(null));
+        } else if (typeof value === "function" && isSignal(value as () => void)) {
+          effect(() => binding.set((value as () => HtmlPrimitive)()));
+        } else {
+          binding.set(value as HtmlPrimitive | EventListener);
+        }
+      }
+    } catch (error) {
+      setupError = error;
+      setupFailed = true;
+    }
+  });
+
+  const unbind = () => {
+    disposeEffects();
+    for (const dispose of cleanup) {
+      dispose();
+    }
+    cleanup.length = 0;
+  };
+
+  if (setupFailed) {
+    unbind();
+    throw setupError;
+  }
+
+  return unbind;
 }

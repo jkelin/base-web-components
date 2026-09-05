@@ -1,13 +1,12 @@
-import { effect, effectScope, isSignal, signal } from "alien-signals";
+import { signal } from "alien-signals";
+import { renderWithProps, useProp } from "./component-props";
 import {
+  bindTemplateBindings,
   extractAttributeBindings,
   extractTextBindings,
   interpolationMarkerPrefix,
-  type HtmlPrimitive,
-  type TemplateBinding,
+  type HtmlValue,
 } from "./template-bindings";
-
-type HtmlValue = HtmlPrimitive | EventListener | (() => HtmlPrimitive);
 
 type HtmlTemplate = {
   fragment: DocumentFragment;
@@ -27,7 +26,7 @@ function defineComponent(
   customElements.define(
     componentName,
     class extends elementConstructor {
-      readonly #renderedTemplate = render();
+      readonly #renderedTemplate = renderWithProps(this, render);
       readonly #shadowRoot = this.attachShadow({ mode: "open" });
       #unbind: (() => void) | undefined;
 
@@ -91,37 +90,7 @@ function html(template: TemplateStringsArray, ...values: HtmlValue[]): HtmlTempl
 
   return {
     fragment: templateElement.content,
-    bind: () => {
-      const boundEventHandlers: TemplateBinding[] = [];
-      const disposeEffects = effectScope(() => {
-        for (const binding of bindings) {
-          const value = values[binding.index];
-          if (value === undefined && !(binding.index in values)) {
-            throw new Error(`Missing template value at index ${binding.index}.`);
-          }
-
-          if (typeof value === "function" && isSignal(value as () => void)) {
-            effect(() => {
-              binding.set((value as () => HtmlPrimitive)());
-            });
-            continue;
-          }
-
-          binding.set(value as HtmlPrimitive | EventListener);
-          if (binding.isEventHandler) {
-            boundEventHandlers.push(binding);
-          }
-        }
-      });
-
-      return () => {
-        disposeEffects();
-
-        for (const binding of boundEventHandlers) {
-          binding.set(null);
-        }
-      };
-    },
+    bind: () => bindTemplateBindings(bindings, values),
   };
 }
 
@@ -131,6 +100,7 @@ defineComponent(
     // Every component instance owns its signal, including after sibling updates.
     const disabled = signal(false);
     const textValue = signal("");
+    const label = useProp("label");
 
     return html`
       <slot name="__properties" disabled></slot>
@@ -166,14 +136,7 @@ defineComponent(
           class="paragraph-toggle"
           data-testid="paragraph-toggle"
           type="checkbox"
-          onchange=${(event: Event) => {
-            // currentTarget is validated because synthetic callers may provide another target.
-            if (!(event.currentTarget instanceof HTMLInputElement)) {
-              throw new TypeError("Checkbox change handler requires an input currentTarget.");
-            }
-
-            disabled(event.currentTarget.checked);
-          }}
+          bind:onchange:checked=${disabled}
         />
       </div>
 
@@ -183,18 +146,38 @@ defineComponent(
           class="paragraph-input"
           data-testid="paragraph-input"
           type="text"
-          oninput=${(event: Event) => {
-            // currentTarget remains the bound input even when the event bubbles.
-            if (!(event.currentTarget instanceof HTMLInputElement)) {
-              throw new TypeError("Text input handler requires an input currentTarget.");
-            }
-
-            textValue(event.currentTarget.value);
-          }}
+          bind:oninput:value=${textValue}
         />
         <div data-testid="paragraph-value">value: ${textValue}</div>
+        <p data-testid="paragraph-label">Component label: ${label}</p>
+        <button
+          id="paragraph-label-update"
+          class="paragraph-action"
+          data-testid="paragraph-label-update"
+          onclick=${() => label("Changed through the signal")}
+        >
+          Update label signal
+        </button>
       </div>
     `;
   },
   "p",
 );
+
+const showcase = document.querySelector<HTMLElement & { label: string | null }>("#prop-showcase");
+const setProperty = document.querySelector<HTMLButtonElement>("#set-label-property");
+const setAttribute = document.querySelector<HTMLButtonElement>("#set-label-attribute");
+const removeAttribute = document.querySelector<HTMLButtonElement>("#remove-label-attribute");
+if (!showcase || !setProperty || !setAttribute || !removeAttribute) {
+  throw new Error("Missing prop showcase host or controls.");
+}
+
+setProperty.addEventListener("click", () => {
+  showcase.label = "Changed through the property";
+});
+setAttribute.addEventListener("click", () => {
+  showcase.setAttribute("label", "Changed through the attribute");
+});
+removeAttribute.addEventListener("click", () => {
+  showcase.removeAttribute("label");
+});
