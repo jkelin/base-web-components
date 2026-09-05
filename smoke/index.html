@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>basic-web-components lab</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="bg-paper min-h-screen text-stone-900 antialiased">
+    <main class="mx-auto flex min-w-0 max-w-4xl flex-col gap-4 p-4 sm:p-6">
+      <header class="rounded-md border border-stone-800 bg-stone-900 px-4 py-3 text-stone-100">
+        <div class="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
+          <div class="min-w-0">
+            <p
+              class="text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none"
+            >
+              basic-web-components · lab
+            </p>
+            <h1 class="mt-1 text-lg font-semibold tracking-tight">Counter + six suites</h1>
+          </div>
+          <p class="font-mono text-xs break-all text-stone-400">source-condition · no prebuild</p>
+        </div>
+        <ul
+          id="rail"
+          data-testid="rail"
+          class="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-stone-800 pt-3"
+          aria-label="Entry registration"
+        >
+          <li
+            id="rail-counter"
+            data-testid="rail-counter"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >counter
+          </li>
+          <li
+            id="rail-accordion"
+            data-testid="rail-accordion"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >accordion
+          </li>
+          <li
+            id="rail-modal"
+            data-testid="rail-modal"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >modal
+          </li>
+          <li
+            id="rail-popover"
+            data-testid="rail-popover"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >popover
+          </li>
+          <li
+            id="rail-switch"
+            data-testid="rail-switch"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >switch
+          </li>
+          <li
+            id="rail-otp"
+            data-testid="rail-otp"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >otp
+          </li>
+          <li
+            id="rail-tabs"
+            data-testid="rail-tabs"
+            data-state="pending"
+            class="group flex items-center gap-1.5 font-mono text-xs text-stone-300"
+          >
+            <span
+              class="inline-block size-1.5 rounded-full bg-amber-400 group-data-[state=ready]:bg-emerald-400"
+              aria-hidden="true"
+            ></span
+            >tabs
+          </li>
+        </ul>
+      </header>
+
+      <section aria-label="Counter" class="rounded-md border border-stone-300 bg-white">
+        <div
+          class="flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-b border-stone-200 px-4 py-2"
+        >
+          <h2 class="text-xs font-semibold tracking-[0.12em] text-stone-600 uppercase select-none">
+            Counter
+          </h2>
+          <span class="font-mono text-[11px] break-all text-stone-500"
+            >bwc-counter · uncontrolled</span
+          >
+        </div>
+        <div class="p-4">
+          <bwc-counter
+            id="smoke-counter"
+            class="flex min-w-0 flex-wrap items-center gap-3"
+            data-testid="smoke-counter"
+            default-value="3"
+          >
+            <button
+              is="bwc-counter-minus-button"
+              id="smoke-minus-button"
+              class="min-h-11 min-w-11 cursor-pointer rounded border border-stone-900 bg-stone-900 px-3 py-1 text-center font-mono text-sm text-white transition hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-950 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="smoke-minus-button"
+            ></button>
+            <span
+              is="bwc-counter-label"
+              id="smoke-label"
+              class="min-w-10 rounded border border-stone-200 bg-stone-100 px-2 py-1 text-center font-mono text-lg tabular-nums"
+              data-testid="smoke-label"
+            ></span>
+            <button
+              is="bwc-counter-plus-button"
+              id="smoke-plus-button"
+              class="min-h-11 min-w-11 cursor-pointer rounded border border-stone-900 bg-stone-900 px-3 py-1 text-center font-mono text-sm text-white transition hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-950 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="smoke-plus-button"
+            ></button>
+          </bwc-counter>
+        </div>
+      </section>
+
+      <section aria-label="Controlled mode" class="rounded-md border border-stone-300 bg-white">
+        <div
+          class="flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-b border-stone-200 px-4 py-2"
+        >
+          <h2 class="text-xs font-semibold tracking-[0.12em] text-stone-600 uppercase select-none">
+            Controlled mode
+          </h2>
+          <span class="font-mono text-[11px] break-all text-stone-500"
+            >bwc-counter · value-driven</span
+          >
+        </div>
+        <div class="flex min-w-0 flex-wrap items-center gap-4 p-4">
+          <bwc-counter
+            id="controlled-counter"
+            class="flex min-w-0 flex-wrap items-center gap-3"
+            data-testid="controlled-counter"
+            value="5"
+          >
+            <button
+              is="bwc-counter-minus-button"
+              id="controlled-minus-button"
+              class="min-h-11 min-w-11 cursor-pointer rounded border border-stone-900 bg-stone-900 px-3 py-1 text-center font-mono text-sm text-white transition hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-950 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="controlled-minus-button"
+            ></button>
+            <span
+              is="bwc-counter-label"
+              id="controlled-label"
+              class="min-w-10 rounded border border-stone-200 bg-stone-100 px-2 py-1 text-center font-mono text-lg tabular-nums"
+              data-testid="controlled-label"
+            ></span>
+            <button
+              is="bwc-counter-plus-button"
+              id="controlled-plus-button"
+              class="min-h-11 min-w-11 cursor-pointer rounded border border-stone-900 bg-stone-900 px-3 py-1 text-center font-mono text-sm text-white transition hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-950 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="controlled-plus-button"
+            ></button>
+          </bwc-counter>
+          <p class="font-mono text-xs text-stone-600">
+            value=<output
+              id="controlled-value"
+              data-testid="controlled-value"
+              class="rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 font-bold text-stone-900"
+              >5</output
+            >
+          </p>
+        </div>
+      </section>
+
+      <section aria-label="Suites" class="rounded-md border border-stone-300 bg-white">
+        <div
+          class="flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-b border-stone-200 px-4 py-2"
+        >
+          <h2 class="text-xs font-semibold tracking-[0.12em] text-stone-600 uppercase select-none">
+            Suites
+          </h2>
+          <span class="font-mono text-[11px] break-all text-stone-500"
+            >six state machines · native hosts</span
+          >
+        </div>
+        <article
+          id="suite-card"
+          data-testid="suite-card"
+          class="grid min-w-0 grid-cols-1 divide-y divide-stone-200"
+        >
+          <div class="grid min-w-0 grid-cols-1 gap-2 p-4">
+            <p class="font-mono text-[11px] break-all text-stone-500">bwc-accordion · data-open</p>
+            <bwc-accordion id="smoke-accordion" data-testid="smoke-accordion" class="block min-w-0">
+              <bwc-accordion-item
+                value="details"
+                class="block min-w-0 data-[open]:border-emerald-600"
+              >
+                <button
+                  is="bwc-accordion-trigger"
+                  id="smoke-accordion-trigger"
+                  class="min-h-11 w-full min-w-0 cursor-pointer rounded border border-stone-300 bg-white px-3 py-2 text-left text-sm font-medium transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 aria-expanded:border-emerald-600 aria-expanded:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 data-[open]:border-emerald-600 data-[open]:bg-emerald-50"
+                  data-testid="smoke-accordion-trigger"
+                >
+                  Details
+                </button>
+                <bwc-accordion-panel
+                  id="smoke-accordion-panel"
+                  class="mt-2 block min-w-0 rounded border border-stone-200 bg-stone-100 px-3 py-2 text-sm break-words text-stone-700 data-[open]:border-emerald-600"
+                  data-testid="smoke-accordion-panel"
+                >
+                  Selectable panel
+                </bwc-accordion-panel>
+              </bwc-accordion-item>
+            </bwc-accordion>
+          </div>
+
+          <div class="grid min-w-0 grid-cols-1 gap-2 p-4">
+            <p class="font-mono text-[11px] break-all text-stone-500">bwc-modal · dialog host</p>
+            <bwc-modal
+              id="smoke-modal"
+              data-testid="smoke-modal"
+              class="flex min-w-0 flex-wrap items-center gap-2"
+              trigger-class="min-h-11 cursor-pointer rounded border border-stone-300 bg-white px-3 py-1 text-sm transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 data-[open]:border-emerald-600"
+              popup-class="m-auto max-w-[calc(100vw-2rem)] rounded-md border border-stone-300 bg-white p-4 text-sm text-stone-900 shadow-sm data-[open]:border-emerald-600"
+              close-class="ml-2 min-h-11 cursor-pointer rounded border border-stone-300 bg-stone-100 px-2 py-1 text-sm transition hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-300"
+            >
+              <button
+                is="bwc-modal-trigger"
+                id="smoke-modal-trigger"
+                data-testid="smoke-modal-trigger"
+              >
+                Open modal
+              </button>
+              <dialog is="bwc-modal-popup" id="smoke-modal-popup" data-testid="smoke-modal-popup">
+                <span class="text-sm">Modal content</span>
+                <button is="bwc-modal-close" id="smoke-modal-close" data-testid="smoke-modal-close">
+                  Close
+                </button>
+              </dialog>
+            </bwc-modal>
+          </div>
+
+          <div class="grid min-w-0 grid-cols-1 gap-2 p-4">
+            <p class="font-mono text-[11px] break-all text-stone-500">
+              bwc-popover · div host · aria-expanded
+            </p>
+            <bwc-popover
+              id="smoke-popover"
+              data-testid="smoke-popover"
+              side="bottom"
+              side-offset="4"
+              class="flex min-w-0 flex-wrap items-center gap-2"
+            >
+              <button
+                is="bwc-popover-trigger"
+                id="smoke-popover-trigger"
+                class="min-h-11 cursor-pointer rounded border border-stone-300 bg-white px-3 py-1 text-sm transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 aria-expanded:border-emerald-600 aria-expanded:bg-emerald-50"
+                data-testid="smoke-popover-trigger"
+              >
+                Open popover
+              </button>
+              <div
+                is="bwc-popover-popup"
+                id="smoke-popover-popup"
+                class="min-w-0 rounded border border-stone-300 bg-white p-3 text-sm break-words shadow-sm data-[open]:border-emerald-600"
+                data-testid="smoke-popover-popup"
+              >
+                Popover content
+                <button
+                  is="bwc-popover-close"
+                  id="smoke-popover-close"
+                  class="ml-2 min-h-11 cursor-pointer rounded border border-stone-300 bg-stone-100 px-2 py-1 text-sm transition hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-300"
+                  data-testid="smoke-popover-close"
+                >
+                  Close
+                </button>
+              </div>
+            </bwc-popover>
+          </div>
+
+          <div class="grid min-w-0 grid-cols-1 gap-2 p-4">
+            <p class="font-mono text-[11px] break-all text-stone-500">
+              bwc-switch · generated track/thumb
+            </p>
+            <div class="flex min-h-11 min-w-0 items-center gap-2 text-sm text-stone-700">
+              <label
+                id="smoke-switch-label"
+                data-testid="smoke-switch-label"
+                for="smoke-switch-button"
+                class="cursor-pointer select-none"
+                >Choice</label
+              >
+              <bwc-switch
+                id="smoke-switch"
+                data-testid="smoke-switch"
+                button-class="flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-stone-300 bg-white px-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[checked]:border-emerald-600 data-[checked]:bg-emerald-600 data-[readonly]:opacity-70"
+                thumb-class="size-5 rounded-full bg-stone-400 transition-transform data-[checked]:translate-x-[22px] data-[checked]:bg-white"
+                input-class=""
+              ></bwc-switch>
+            </div>
+          </div>
+
+          <div class="grid min-w-0 grid-cols-1 gap-2 p-4">
+            <p class="font-mono text-[11px] break-all text-stone-500">
+              bwc-otp · length-generated fields · data-complete
+            </p>
+            <bwc-otp
+              id="smoke-otp"
+              data-testid="smoke-otp"
+              length="4"
+              validation-type="numeric"
+              name="smoke-code"
+              field-class="h-11 w-11 rounded-md border border-stone-300 bg-white text-center font-mono text-lg outline-none hover:border-stone-400 focus-visible:border-stone-900 focus-visible:ring-2 focus-visible:ring-stone-900/15 disabled:cursor-not-allowed disabled:opacity-40 data-[complete]:border-emerald-600 data-[complete]:bg-emerald-50"
+              hidden-input-class=""
+              class="flex min-w-0 flex-wrap gap-2"
+            ></bwc-otp>
+          </div>
+
+          <div class="grid min-w-0 grid-cols-1 gap-2 p-4">
+            <p class="font-mono text-[11px] break-all text-stone-500">bwc-tabs · aria-selected</p>
+            <bwc-tabs
+              id="smoke-tabs"
+              data-testid="smoke-tabs"
+              default-value="one"
+              class="grid min-w-0 grid-cols-1 gap-2"
+            >
+              <bwc-tabs-list class="flex min-w-0 gap-1 overflow-x-auto border-b border-stone-200">
+                <button
+                  is="bwc-tab"
+                  id="smoke-tab-one"
+                  class="min-h-11 cursor-pointer rounded-t border-b-2 border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-stone-500 transition hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 aria-selected:border-emerald-600 aria-selected:font-semibold aria-selected:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[active]:border-emerald-600 data-[active]:text-stone-900"
+                  data-testid="smoke-tab-one"
+                  value="one"
+                >
+                  One
+                </button>
+                <button
+                  is="bwc-tab"
+                  id="smoke-tab-two"
+                  class="min-h-11 cursor-pointer rounded-t border-b-2 border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-stone-500 transition hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 aria-selected:border-emerald-600 aria-selected:font-semibold aria-selected:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[active]:border-emerald-600 data-[active]:text-stone-900"
+                  data-testid="smoke-tab-two"
+                  value="two"
+                >
+                  Two
+                </button>
+              </bwc-tabs-list>
+              <bwc-tab-panel
+                id="smoke-tab-panel-one"
+                class="min-w-0 rounded border border-stone-200 p-3 text-sm break-words data-[active]:border-emerald-600"
+                data-testid="smoke-tab-panel-one"
+                value="one"
+              >
+                One panel
+              </bwc-tab-panel>
+              <bwc-tab-panel
+                id="smoke-tab-panel-two"
+                class="min-w-0 rounded border border-stone-200 p-3 text-sm break-words data-[active]:border-emerald-600"
+                data-testid="smoke-tab-panel-two"
+                value="two"
+              >
+                Two panel
+              </bwc-tab-panel>
+            </bwc-tabs>
+          </div>
+        </article>
+      </section>
+
+      <output
+        id="smoke-result"
+        data-testid="smoke-result"
+        data-status="running"
+        class="rounded-md border-2 border-stone-300 bg-white px-4 py-3 font-mono text-sm font-semibold break-words text-stone-500 data-[status=pass]:border-emerald-600 data-[status=pass]:bg-emerald-50 data-[status=pass]:text-emerald-700 data-[status=fail]:border-rose-600 data-[status=fail]:bg-rose-50 data-[status=fail]:text-rose-700"
+        >Running…</output
+      >
+      <div id="smoke-fixtures" class="hidden" data-testid="smoke-fixtures"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

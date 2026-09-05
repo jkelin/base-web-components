@@ -1,0 +1,24 @@
+{
+  "name": "smoke",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vite dev harness exercising basic-web-components subpaths from source.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "format": "oxfmt --write src"
+  },
+  "dependencies": {
+    "basic-web-components": "workspace:*"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2"
+  }
+}

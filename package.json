@@ -2,16 +2,17 @@
   "name": "webcomponents-workspace",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "smoke"
   ],
   "scripts": {
     "build": "bun run --filter '*' build",
     "check": "bun run typecheck",
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
-    "size": "bun scripts/measure-sizes.ts",
-    "lint": "bun run --parallel --filter '*' lint && oxlint scripts",
-    "format": "bun run --parallel --filter '*' format && oxfmt --write scripts",
+    "dev": "bun run --filter smoke dev",
+    "lint": "bun run --parallel --filter '*' lint",
+    "format": "bun run --parallel --filter '*' format",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -1,0 +1,96 @@
+{
+  "name": "basic-web-components",
+  "version": "1.0.0",
+  "description": "Small self-registering web components.",
+  "files": [
+    "dist",
+    "src/*/index.ts"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/counter/index.ts",
+    "./src/accordion/index.ts",
+    "./src/modal/index.ts",
+    "./src/popover/index.ts",
+    "./src/switch/index.ts",
+    "./src/otp/index.ts",
+    "./src/tabs/index.ts",
+    "./dist/counter.js",
+    "./dist/accordion.js",
+    "./dist/modal.js",
+    "./dist/popover.js",
+    "./dist/switch.js",
+    "./dist/otp.js",
+    "./dist/tabs.js"
+  ],
+  "exports": {
+    "./counter": {
+      "types": "./src/counter/index.ts",
+      "source": "./src/counter/index.ts",
+      "development": "./src/counter/index.ts",
+      "import": "./dist/counter.js",
+      "default": "./dist/counter.js"
+    },
+    "./accordion": {
+      "types": "./src/accordion/index.ts",
+      "source": "./src/accordion/index.ts",
+      "development": "./src/accordion/index.ts",
+      "import": "./dist/accordion.js",
+      "default": "./dist/accordion.js"
+    },
+    "./modal": {
+      "types": "./src/modal/index.ts",
+      "source": "./src/modal/index.ts",
+      "development": "./src/modal/index.ts",
+      "import": "./dist/modal.js",
+      "default": "./dist/modal.js"
+    },
+    "./popover": {
+      "types": "./src/popover/index.ts",
+      "source": "./src/popover/index.ts",
+      "development": "./src/popover/index.ts",
+      "import": "./dist/popover.js",
+      "default": "./dist/popover.js"
+    },
+    "./switch": {
+      "types": "./src/switch/index.ts",
+      "source": "./src/switch/index.ts",
+      "development": "./src/switch/index.ts",
+      "import": "./dist/switch.js",
+      "default": "./dist/switch.js"
+    },
+    "./otp": {
+      "types": "./src/otp/index.ts",
+      "source": "./src/otp/index.ts",
+      "development": "./src/otp/index.ts",
+      "import": "./dist/otp.js",
+      "default": "./dist/otp.js"
+    },
+    "./tabs": {
+      "types": "./src/tabs/index.ts",
+      "source": "./src/tabs/index.ts",
+      "development": "./src/tabs/index.ts",
+      "import": "./dist/tabs.js",
+      "default": "./dist/tabs.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "format": "oxfmt --write src"
+  },
+  "dependencies": {
+    "alien-signals": "^3.2.1"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.12.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}
