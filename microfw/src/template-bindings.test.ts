@@ -191,6 +191,80 @@ describe("extractAttributeBindings", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("preserves a handler assigned after binding when unbinding", () => {
+    const fragment = fragmentFrom(
+      `<button id="owned-handler" data-testid="owned-handler" onclick="${marker(0)}"></button>`,
+    );
+    const button = fragment.querySelector<HTMLButtonElement>("button")!;
+    const boundHandler = vi.fn();
+    const replacementHandler = vi.fn();
+    const unbind = bindTemplateBindings(extractAttributeBindings(fragment, 1, token), [
+      boundHandler,
+    ]);
+
+    button.onclick = replacementHandler;
+    unbind();
+    button.click();
+
+    expect(boundHandler).not.toHaveBeenCalled();
+    expect(replacementHandler).toHaveBeenCalledOnce();
+  });
+
+  it("binds setup values beyond the signed 32-bit index range", () => {
+    const largeIndex = 2 ** 31;
+    const fragment = fragmentFrom(
+      `<button id="large-index" data-testid="large-index" onclick="${marker(largeIndex)}"></button>`,
+    );
+    const button = fragment.querySelector<HTMLButtonElement>("button")!;
+    const handler = vi.fn();
+    const values = [] as Parameters<typeof bindTemplateBindings>[1];
+    values[largeIndex] = handler;
+    const bindings = extractAttributeBindings(fragment, largeIndex + 1, token);
+
+    const unbind = bindTemplateBindings(bindings, values);
+    button.click();
+
+    expect(handler).toHaveBeenCalledOnce();
+    unbind();
+  });
+
+  it("disposes a signal effect when its initial DOM write throws", () => {
+    const fragment = fragmentFrom(
+      `<div data-testid="throwing-binding" title="${marker(0)}"></div>`,
+    );
+    const box = fragment.querySelector<HTMLElement>("[data-testid='throwing-binding']")!;
+    const title = signal("first");
+    const bindings = extractAttributeBindings(fragment, 1, token);
+    const reflectionError = new Error("initial reflection failed");
+    const setAttribute = box.setAttribute.bind(box);
+    let writeCount = 0;
+    box.setAttribute = (name, value) => {
+      writeCount += 1;
+      if (writeCount === 1) {
+        throw reflectionError;
+      }
+      setAttribute(name, value);
+    };
+
+    expect(() => bindTemplateBindings(bindings, [title])).toThrow(reflectionError);
+    title("second");
+    expect(writeCount).toBe(1);
+    expect(box.hasAttribute("title")).toBe(false);
+  });
+
+  it("disposes a signal effect when its initial value is invalid", () => {
+    const fragment = fragmentFrom(
+      `<div data-testid="invalid-initial-signal" title="${marker(0)}"></div>`,
+    );
+    const box = fragment.querySelector<HTMLElement>("[data-testid='invalid-initial-signal']")!;
+    const title = signal<unknown>({});
+    const bindings = extractAttributeBindings(fragment, 1, token);
+
+    expect(() => bindTemplateBindings(bindings, [title as never])).toThrow(TypeError);
+    title("valid");
+    expect(box.hasAttribute("title")).toBe(false);
+  });
+
   it("discards signal effects when setup fails partway", () => {
     // Bindings bind in array order, so the valid subscription precedes the failure.
     const titleFragment = fragmentFrom(
@@ -264,6 +338,18 @@ describe("extractAttributeBindings", () => {
     const textFragment = fragmentFrom(`<div data-testid="text-box">${marker(0)}</div>`);
     const textBindings = extractTextBindings(textFragment, 1, token);
     expect(() => bindTemplateBindings(textBindings, [() => "handler"])).toThrow(TypeError);
+  });
+
+  it.each([
+    fragmentFrom(`<div data-testid="object-attribute" title="${marker(0)}"></div>`),
+    fragmentFrom(`<div data-testid="object-text">${marker(0)}</div>`),
+  ])("rejects non-primitive interpolation values", (fragment) => {
+    const bindings = [
+      ...extractAttributeBindings(fragment, 1, token),
+      ...extractTextBindings(fragment, 1, token),
+    ];
+
+    expect(() => bindTemplateBindings(bindings, [{} as never])).toThrow(TypeError);
   });
 
   it.each([["clicked"], [signal("nope")]])("rejects non-handler event value %s", (value) => {

@@ -1,6 +1,5 @@
-import { signal } from "alien-signals";
 import { describe, expect, it, vi } from "vitest";
-import { defineComponent, html, useProp } from "./main";
+import { defineComponent, html, signal, useProp } from "./main";
 
 let elementCounter = 0;
 function elementName(prefix: string): string {
@@ -138,6 +137,9 @@ describe("defineComponent", () => {
       expect(button.textContent).toBe("count: 1");
 
       host.remove();
+      const lifecycle = host as HTMLElement & { disconnectedCallback: () => void };
+      lifecycle.disconnectedCallback();
+      lifecycle.disconnectedCallback();
       button.click();
       expect(button.textContent).toBe("count: 1");
 
@@ -334,8 +336,8 @@ describe("defineComponent", () => {
   });
   it("keeps static first-id marker text literal while binding the interpolation", async () => {
     // Dynamic import is required here: only a fresh module reset restarts the
-    // marker counter at zero, so microfw:0:0; is the first available marker id
-    // without pinning the shared global sequence a static import would reuse.
+    // marker counter at zero, where `0:` collides with the literal text and
+    // `1:` becomes the first available marker id.
     vi.resetModules();
     const fresh = await import("./main");
     const template = fresh.html`<div data-testid="first-id">literal microfw:0:0; plus ${"bound"}</div>`;
@@ -349,6 +351,110 @@ describe("defineComponent", () => {
     } finally {
       unbind();
     }
+  });
+
+  it("keeps entity-decoded marker text and attributes literal", async () => {
+    // A fresh module is required to exercise entity decoding against marker zero.
+    vi.resetModules();
+    const fresh = await import("./main");
+    const template = fresh.html`<div
+      data-testid="entity-marker"
+      title="&#48;&#58;0;"
+    >literal &#48;&#58;0; plus ${"bound"}</div>`;
+    const host = document.createElement("div");
+    host.append(template.fragment);
+    const unbind = template.bind();
+    try {
+      const box = host.querySelector('[data-testid="entity-marker"]')!;
+      expect(box.getAttribute("title")).toBe("0:0;");
+      expect(box.textContent).toBe("literal 0:0; plus bound");
+    } finally {
+      unbind();
+    }
+  });
+
+  it("retries a marker decoded inside a static mixed attribute", async () => {
+    // A fresh module makes the decoded static text collide with marker zero.
+    vi.resetModules();
+    const fresh = await import("./main");
+    const template = fresh.html`<div
+      data-testid="mixed-entity-marker"
+      title="prefix &#48;:0;"
+    >${"live"}</div>`;
+    const host = document.createElement("div");
+    host.append(template.fragment);
+    const unbind = template.bind();
+    try {
+      const box = host.querySelector('[data-testid="mixed-entity-marker"]')!;
+      expect(box.getAttribute("title")).toBe("prefix 0:0;");
+      expect(box.textContent).toBe("live");
+    } finally {
+      unbind();
+    }
+  });
+
+  it("retries a decoded collision before an incomplete interpolated attribute", async () => {
+    vi.resetModules();
+    const fresh = await import("./main");
+    const template = fresh.html`<div data-testid="incomplete-entity-marker" title="prefix &#48;:0;" data-x="${"live"}"></div>`;
+    const host = document.createElement("div");
+    host.append(template.fragment);
+    const unbind = template.bind();
+    try {
+      const box = host.querySelector('[data-testid="incomplete-entity-marker"]')!;
+      expect(box.getAttribute("title")).toBe("prefix 0:0;");
+      expect(box.getAttribute("data-x")).toBe("live");
+    } finally {
+      unbind();
+    }
+  });
+
+  it("renders decoded marker-like text when there are no substitutions", async () => {
+    vi.resetModules();
+    const fresh = await import("./main");
+    const template = fresh.html`<div data-testid="static-entity-marker" title="&#48;:"></div>`;
+    const host = document.createElement("div");
+    host.append(template.fragment);
+    const unbind = template.bind();
+    try {
+      expect(
+        host.querySelector('[data-testid="static-entity-marker"]')!.getAttribute("title"),
+      ).toBe("0:");
+    } finally {
+      unbind();
+    }
+  });
+
+  it("rejects a parser-cloned interpolation that masks a discarded one", () => {
+    // happy-dom omits adoption-agency cloning; emulate Chromium's observed clone/discard result.
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLTemplateElement.prototype, "innerHTML")!;
+    Object.defineProperty(HTMLTemplateElement.prototype, "innerHTML", {
+      ...descriptor,
+      set(markup: string) {
+        descriptor.set!.call(this, markup);
+        if (markup.includes('data-testid="parser-clone"')) {
+          const node = (this as HTMLTemplateElement).content.querySelector("i[title]")!;
+          node.after(node.cloneNode(true));
+        }
+      },
+    });
+
+    try {
+      expect(
+        () =>
+          html`<p data-testid="parser-clone"><b><i title=${"first"} data-kept="static" data-kept=${"discarded"}>x</b>y</i></p>`,
+      ).toThrow(Error);
+    } finally {
+      Object.defineProperty(HTMLTemplateElement.prototype, "innerHTML", descriptor);
+    }
+  });
+
+  it.each([
+    () => html`<div title="before ${"bound"} after"></div>`,
+    () => html`<!-- ${"bound"} -->`,
+    () => html`<${"div"}></${"div"}>`,
+  ])("rejects an interpolation outside supported text or whole-attribute contexts", (render) => {
+    expect(render).toThrow(Error);
   });
 
   it("renders signal HTML as text without injection", () => {

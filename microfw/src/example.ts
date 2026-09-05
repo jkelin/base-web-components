@@ -1,5 +1,4 @@
-import { signal } from "alien-signals";
-import { defineComponent, html, useProp } from "./main";
+import { defineComponent, html, signal, useProp } from "./main";
 
 defineComponent(
   "my-paragraph",

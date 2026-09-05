@@ -1,10 +1,20 @@
 import { effect, signal } from "alien-signals";
 
+// Tuples remove repeated property keys from production output; named indices document each slot.
+const PROP_VALUE = 0;
+const PROP_ATTRIBUTE = 1;
+const PROP_DISPOSE = 2;
+const CONTEXT_HOST = 0;
+const CONTEXT_PROPS = 1;
+const CONTEXT_OBSERVER = 2;
+const WRITE_ARGUMENT_INDEX = 0;
+
 export type PropSignal = {
   (): string | null;
   (value: string | null): void;
 };
-type Prop = [value: PropSignal, attribute: string | null, dispose?: () => void];
+// PROP_ATTRIBUTE is the last synchronized DOM value; a mismatch gives a detached/external edit precedence.
+type Prop = [value: PropSignal, lastAttribute: string | null, dispose?: () => void];
 type PropContext = [host: HTMLElement, props: Map<string, Prop>, observer?: MutationObserver];
 
 export type PropRender<Result> = {
@@ -21,43 +31,55 @@ function validate(value: unknown): asserts value is string | null {
   }
 }
 
+// A failed DOM mutation leaves the snapshot unchanged so setup cleanup or reconnect can retry.
+function reflectProp(context: PropContext, name: string, prop: Prop, next: unknown): void {
+  validate(next);
+  if (context[CONTEXT_HOST].getAttribute(name) !== next) {
+    if (next === null) {
+      context[CONTEXT_HOST].removeAttribute(name);
+    } else {
+      context[CONTEXT_HOST].setAttribute(name, next);
+    }
+  }
+  prop[PROP_ATTRIBUTE] = next;
+}
+
 function reconcile(context: PropContext): void {
-  for (const [name, prop] of context[1]) {
-    const attribute = context[0].getAttribute(name);
-    if (attribute !== prop[1]) {
-      prop[1] = attribute;
-      prop[0](attribute);
+  for (const [name, prop] of context[CONTEXT_PROPS]) {
+    const attribute = context[CONTEXT_HOST].getAttribute(name);
+    if (attribute !== prop[PROP_ATTRIBUTE]) {
+      prop[PROP_ATTRIBUTE] = attribute;
+      prop[PROP_VALUE](attribute);
     }
   }
 }
 
 function start(context: PropContext): void {
-  if (context[1].size === 0) {
+  if (context[CONTEXT_PROPS].size === 0) {
     return;
   }
 
   try {
     reconcile(context);
-    for (const [name, prop] of context[1]) {
-      prop[2] = effect(() => {
-        const next = prop[0]();
-        validate(next);
-        if (context[0].getAttribute(name) !== next) {
-          if (next === null) {
-            context[0].removeAttribute(name);
-          } else {
-            context[0].setAttribute(name, next);
-          }
+    for (const [name, prop] of context[CONTEXT_PROPS]) {
+      // Complete fallible reflection before subscribing. The first effect run
+      // only tracks the signal, so setup errors cannot leak a live effect.
+      reflectProp(context, name, prop, prop[PROP_VALUE]());
+      let initialized = false;
+      prop[PROP_DISPOSE] = effect(() => {
+        const next = prop[PROP_VALUE]();
+        if (initialized) {
+          reflectProp(context, name, prop, next);
         }
-        prop[1] = next;
       });
+      initialized = true;
     }
 
     const observer = new MutationObserver(() => reconcile(context));
-    observer.observe(context[0], {
-      attributeFilter: [...context[1].keys()],
+    observer.observe(context[CONTEXT_HOST], {
+      attributeFilter: [...context[CONTEXT_PROPS].keys()],
     });
-    context[2] = observer;
+    context[CONTEXT_OBSERVER] = observer;
   } catch (error) {
     stop(context);
     throw error;
@@ -65,11 +87,11 @@ function start(context: PropContext): void {
 }
 
 function stop(context: PropContext): void {
-  context[2]?.disconnect();
-  delete context[2];
-  for (const prop of context[1].values()) {
-    prop[2]?.();
-    delete prop[2];
+  context[CONTEXT_OBSERVER]?.disconnect();
+  delete context[CONTEXT_OBSERVER];
+  for (const prop of context[CONTEXT_PROPS].values()) {
+    prop[PROP_DISPOSE]?.();
+    delete prop[PROP_DISPOSE];
   }
   reconcile(context);
 }
@@ -88,7 +110,7 @@ export function renderWithProps<Result>(
     return {
       result,
       reconnect: () => {
-        if (context[2]) {
+        if (context[CONTEXT_OBSERVER]) {
           reconcile(context);
         } else {
           start(context);
@@ -114,12 +136,12 @@ export function useProp(name: string): PropSignal {
     throw new TypeError("Invalid prop name.");
   }
 
-  const existing = context[1].get(name);
+  const existing = context[CONTEXT_PROPS].get(name);
   if (existing) {
-    return existing[0];
+    return existing[PROP_VALUE];
   }
 
-  const host = context[0];
+  const host = context[CONTEXT_HOST];
   const descriptor = Object.getOwnPropertyDescriptor(host, name);
   if (descriptor && (!descriptor.configurable || !("value" in descriptor))) {
     throw new TypeError("Prop cannot be replaced.");
@@ -128,17 +150,23 @@ export function useProp(name: string): PropSignal {
   const initial: unknown = descriptor ? descriptor.value : attribute;
   validate(initial);
 
-  const value = signal<string | null>(initial);
+  // A Proxy preserves alien-signals identity for isSignal(). Calls with arguments
+  // validate the write, including explicit undefined, before state mutation.
+  const value = new Proxy(signal<string | null>(initial), {
+    apply(target, thisArgument, argumentsList) {
+      if (argumentsList.length > 0) {
+        validate(argumentsList[WRITE_ARGUMENT_INDEX]);
+      }
+      return Reflect.apply(target, thisArgument, argumentsList);
+    },
+  }) as PropSignal;
   const prop: Prop = [value, attribute];
-  context[1].set(name, prop);
+  context[CONTEXT_PROPS].set(name, prop);
   Object.defineProperty(host, name, {
     configurable: true,
     enumerable: true,
     get: value,
-    set: (next: unknown) => {
-      validate(next);
-      value(next);
-    },
+    set: value,
   });
 
   return value;

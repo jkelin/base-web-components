@@ -1,3 +1,4 @@
+import { isSignal } from "alien-signals";
 import { describe, expect, it } from "vitest";
 import { renderWithProps, useProp } from "./component-props";
 
@@ -149,6 +150,75 @@ describe("useProp", () => {
     }).toThrow(TypeError);
     expect(handle.result()).toBeNull();
     handle.dispose();
+  });
+  it("rejects direct signal writes before connect and while detached", () => {
+    const host = document.createElement("div");
+    host.setAttribute("label", "initial");
+    const handle = renderWithProps(host, () => useProp("label"));
+
+    expect(isSignal(handle.result)).toBe(true);
+    handle.result("");
+    expect(handle.result()).toBe("");
+    handle.result(null);
+    expect(handle.result()).toBeNull();
+    handle.result("initial");
+
+    expect(() => handle.result(42 as unknown as string)).toThrow(TypeError);
+    expect(handle.result()).toBe("initial");
+
+    handle.reconnect();
+    handle.dispose();
+    expect(() => handle.result(undefined as unknown as string)).toThrow(TypeError);
+    expect(handle.result()).toBe("initial");
+  });
+
+  it("rejects direct signal writes while connected without poisoning later updates", () => {
+    const host = document.createElement("div");
+    host.setAttribute("label", "initial");
+    const handle = renderWithProps(host, () => useProp("label"));
+    handle.reconnect();
+
+    expect(() => handle.result(42 as unknown as string)).toThrow(TypeError);
+    expect(handle.result()).toBe("initial");
+    expect(host.getAttribute("label")).toBe("initial");
+
+    handle.result("recovered");
+    expect(handle.result()).toBe("recovered");
+    expect(host.getAttribute("label")).toBe("recovered");
+    handle.dispose();
+  });
+
+  it("rolls back subscriptions when initial property reflection throws", () => {
+    const host = document.createElement("div");
+    host.setAttribute("label", "initial");
+    const handle = renderWithProps(host, () => useProp("label"));
+    handle.result("queued");
+    const setAttribute = host.setAttribute;
+    host.setAttribute = function (name, value) {
+      if (value === "queued") {
+        throw new Error("reflection failed");
+      }
+      setAttribute.call(this, name, value);
+    };
+
+    expect(() => handle.reconnect()).toThrow("reflection failed");
+    host.setAttribute = setAttribute;
+    handle.result("detached");
+    expect(host.getAttribute("label")).toBe("initial");
+    handle.dispose();
+  });
+
+  it("rejects invalid pre-upgrade properties without replacing them", () => {
+    const host = document.createElement("div") as HTMLDivElement & { label: unknown };
+    Object.defineProperty(host, "label", {
+      configurable: true,
+      enumerable: true,
+      value: 42,
+      writable: true,
+    });
+
+    expect(() => renderWithProps(host, () => useProp("label"))).toThrow(TypeError);
+    expect(host.label).toBe(42);
   });
 
   it("rejects replacing non-configurable or accessor properties", () => {
