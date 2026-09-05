@@ -1,0 +1,29 @@
+<html>
+  <body>
+    <template id="custom-paragraph" data-name="my-paragraph" data-element="p">
+      <slot name="__properties" disabled></slot>
+
+      <slot></slot>
+
+      <div>
+        <button bind:disabled="disabled">click me</button>
+        <input type="checkbox" />
+      </div>
+    </template>
+
+    <p is="my-paragraph" class="c2">wqeqwe 1</p>
+
+    <p is="my-paragraph" class="c2">wqeqwe 2</p>
+
+    <style>
+      .c2 {
+        color: blue;
+      }
+      p {
+        font-weight: bold;
+      }
+    </style>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

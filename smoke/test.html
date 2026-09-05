@@ -1,0 +1,106 @@
+<html>
+  <body>
+    <template id="custom-paragraph" data-name="my-paragraph" data-element="p">
+      <slot name="__properties" disabled></slot>
+
+      <slot></slot>
+
+      <div>
+        <button bind:disabled="disabled">click me</button>
+        <input type="checkbox" />
+      </div>
+    </template>
+
+    <p is=my-paragraph class="c2">wqeqwe</p>
+
+    <style>
+      .c2 {color: blue}
+      p {
+        font-weight: bold;
+      }
+    </style>
+
+    <script>
+    let template = document.getElementById("custom-paragraph");
+    let templateContent = template.content;
+    const slot = templateContent.querySelector('slot[name="__properties"]');
+
+    const elementType = template.dataset.element
+        ? document.createElement(template.dataset.element).constructor
+        : HTMLElement;
+
+    const elementState = {disabled: false}
+
+    customElements.define(
+      template.dataset.name,
+      class extends elementType {
+        constructor() {
+          super();
+          const shadowRoot = this.attachShadow({ mode: "open" });
+          shadowRoot.appendChild(document.importNode(templateContent, true));
+
+          if (slot) {
+            for(const cls of slot.classList){
+              this.classList.add(cls)
+            }
+
+            for(const attr of slot.attributes){
+              if(!this.attributes[attr.name]?.value) {
+                this.setAttribute(attr.name, attr.value)
+              }
+            }
+          }
+
+          this.#boundAttrs = Array.from(shadowRoot.querySelectorAll("*"))
+            .flatMap(node =>
+              Array.from(node.attributes)
+                .filter(attr => attr.name.startsWith("bind:"))
+                .map(attr => {
+                  const name = attr.name.replace(/^bind:/, '');
+                  return {
+                    name,
+                    value: attr.value,
+                    node,
+                    attr: node.attributes[name],
+                  }
+                })
+            );
+
+
+          const updateState = this.#updateState.bind(this);
+          updateState(elementState)
+
+          // impl
+          shadowRoot.querySelector('input[type="checkbox"]').addEventListener("change", function () {
+            updateState({disabled: this.checked})
+          })
+        }
+
+        #state = {};
+        #boundAttrs = {};
+
+        #updateState(newState) {
+          for(const key in newState) {
+            for(const attr of this.#boundAttrs.filter(x => x.value === key)) {
+              if(newState[key] === false) {
+                attr.node.removeAttribute(attr.name);
+              } else {
+                attr.node.setAttribute(attr.name, newState[key]);
+              }
+            }
+          }
+
+          this.#state = {...this.#state, ...newState}
+        }
+
+        connectedCallback() {
+          console.log("connected")
+        }
+      },
+      template.dataset.element
+      ? { extends: template.dataset.element }
+      : undefined
+    );
+    </script>
+  </body>
+</html>
