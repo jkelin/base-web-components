@@ -1,10 +1,9 @@
-import { signal } from "alien-signals";
-import { renderWithProps, useProp } from "./component-props";
+import { renderWithProps } from "./component-props";
+export { useProp } from "./component-props";
 import {
   bindTemplateBindings,
   extractAttributeBindings,
   extractTextBindings,
-  interpolationMarkerPrefix,
   type HtmlValue,
 } from "./template-bindings";
 
@@ -12,9 +11,10 @@ type HtmlTemplate = {
   fragment: DocumentFragment;
   bind: () => () => void;
 };
+let templateId = 0;
 
 // A render result is reusable across disconnects; reconnecting only recreates bindings.
-function defineComponent(
+export function defineComponent(
   componentName: string,
   render: () => HtmlTemplate,
   elementName?: string,
@@ -26,48 +26,48 @@ function defineComponent(
   customElements.define(
     componentName,
     class extends elementConstructor {
-      readonly #renderedTemplate = renderWithProps(this, render);
-      readonly #shadowRoot = this.attachShadow({ mode: "open" });
+      readonly #rendered = renderWithProps(this, render);
+      #propertySlot: HTMLSlotElement | null;
       #unbind: (() => void) | undefined;
 
       constructor() {
         super();
 
-        this.#shadowRoot.append(this.#renderedTemplate.fragment);
-
-        const propertySlot = this.#shadowRoot.querySelector<HTMLSlotElement>(
-          'slot[name="__properties"]',
-        );
-        if (!propertySlot) {
-          return;
-        }
-
-        for (const className of propertySlot.classList) {
-          this.classList.add(className);
-        }
-
-        for (const attribute of propertySlot.attributes) {
-          // The reserved slot name locates metadata; it is not a host default.
-          if (attribute.name === "name") {
-            continue;
-          }
-
-          if (!this.hasAttribute(attribute.name)) {
-            this.setAttribute(attribute.name, attribute.value);
-          }
-        }
+        const shadowRoot = this.attachShadow({ mode: "open" });
+        shadowRoot.append(this.#rendered.result.fragment);
+        this.#propertySlot = shadowRoot.querySelector('slot[name="__properties"]');
       }
 
       connectedCallback(): void {
-        // Duplicate connection callbacks replace bindings instead of stacking effects.
+        // Host mutation is deferred because custom-element constructors may not add attributes.
+        const propertySlot = this.#propertySlot;
+        if (propertySlot) {
+          this.#propertySlot = null;
+          for (const className of propertySlot.classList) {
+            this.classList.add(className);
+          }
+          for (const attribute of propertySlot.attributes) {
+            if (attribute.name !== "name" && !this.hasAttribute(attribute.name)) {
+              this.setAttribute(attribute.name, attribute.value);
+            }
+          }
+        }
+
         this.#unbind?.();
-        this.#unbind = this.#renderedTemplate.bind();
+        this.#rendered.reconnect();
+        try {
+          this.#unbind = this.#rendered.result.bind();
+        } catch (error) {
+          this.#rendered.dispose();
+          throw error;
+        }
       }
 
       disconnectedCallback(): void {
-        // Disconnecting before the first connection has nothing to dispose.
+        // Template bindings stop before the prop signals they may read.
         this.#unbind?.();
         this.#unbind = undefined;
+        this.#rendered.dispose();
       }
     },
     elementName ? { extends: elementName } : undefined,
@@ -75,109 +75,24 @@ function defineComponent(
 }
 
 // Attributes require complete markers; text supports markers mixed with static content.
-function html(template: TemplateStringsArray, ...values: HtmlValue[]): HtmlTemplate {
-  const templateElement = document.createElement("template");
-  templateElement.innerHTML = template
-    .map(
-      (part, index) => part + (index < values.length ? `${interpolationMarkerPrefix}${index}` : ""),
-    )
-    .join("");
+export function html(template: TemplateStringsArray, ...values: HtmlValue[]): HtmlTemplate {
+  let marker: string;
+  do {
+    marker = `microfw:${templateId++}:`;
+  } while (template.some((part) => part.includes(marker)));
 
-  const bindings = [
-    ...extractAttributeBindings(templateElement.content, values.length),
-    ...extractTextBindings(templateElement.content, values.length),
-  ];
+  let markup = template[0]!;
+  for (let index = 0; index < values.length; index += 1) {
+    markup += `${marker}${index};${template[index + 1]}`;
+  }
+
+  const templateElement = document.createElement("template");
+  templateElement.innerHTML = markup;
+  const bindings = extractAttributeBindings(templateElement.content, values.length, marker);
+  extractTextBindings(templateElement.content, values.length, marker, bindings);
 
   return {
     fragment: templateElement.content,
     bind: () => bindTemplateBindings(bindings, values),
   };
 }
-
-defineComponent(
-  "my-paragraph",
-  () => {
-    // Every component instance owns its signal, including after sibling updates.
-    const disabled = signal(false);
-    const textValue = signal("");
-    const label = useProp("label");
-
-    return html`
-      <slot name="__properties" disabled></slot>
-
-      <slot></slot>
-      <style>
-        .paragraph-action,
-        .paragraph-toggle {
-          cursor: pointer;
-        }
-
-        .paragraph-input {
-          cursor: text;
-        }
-
-        .paragraph-action:disabled,
-        .paragraph-toggle:disabled {
-          cursor: not-allowed;
-        }
-      </style>
-
-      <div>
-        <button
-          id="paragraph-action"
-          class="paragraph-action"
-          data-testid="paragraph-action"
-          disabled=${disabled}
-        >
-          click me
-        </button>
-        <input
-          id="paragraph-toggle"
-          class="paragraph-toggle"
-          data-testid="paragraph-toggle"
-          type="checkbox"
-          bind:onchange:checked=${disabled}
-        />
-      </div>
-
-      <div>
-        <input
-          id="paragraph-input"
-          class="paragraph-input"
-          data-testid="paragraph-input"
-          type="text"
-          bind:oninput:value=${textValue}
-        />
-        <div data-testid="paragraph-value">value: ${textValue}</div>
-        <p data-testid="paragraph-label">Component label: ${label}</p>
-        <button
-          id="paragraph-label-update"
-          class="paragraph-action"
-          data-testid="paragraph-label-update"
-          onclick=${() => label("Changed through the signal")}
-        >
-          Update label signal
-        </button>
-      </div>
-    `;
-  },
-  "p",
-);
-
-const showcase = document.querySelector<HTMLElement & { label: string | null }>("#prop-showcase");
-const setProperty = document.querySelector<HTMLButtonElement>("#set-label-property");
-const setAttribute = document.querySelector<HTMLButtonElement>("#set-label-attribute");
-const removeAttribute = document.querySelector<HTMLButtonElement>("#remove-label-attribute");
-if (!showcase || !setProperty || !setAttribute || !removeAttribute) {
-  throw new Error("Missing prop showcase host or controls.");
-}
-
-setProperty.addEventListener("click", () => {
-  showcase.label = "Changed through the property";
-});
-setAttribute.addEventListener("click", () => {
-  showcase.setAttribute("label", "Changed through the attribute");
-});
-removeAttribute.addEventListener("click", () => {
-  showcase.removeAttribute("label");
-});

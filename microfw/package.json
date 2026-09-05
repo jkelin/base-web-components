@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "preview": "vite preview",
+    "dev": "vite --config vite.showcase.config.ts",
+    "preview": "vite preview --config vite.showcase.config.ts",
     "build": "vite build",
+    "build:showcase": "vite build --config vite.showcase.config.ts",
+    "size": "bun run build && bun -e \"const bytes=await Bun.file('dist/microfw.js').bytes();console.log(bytes.length,'raw /',Bun.gzipSync(bytes,{level:9}).length,'gzip-9')\"",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",

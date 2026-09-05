@@ -2,12 +2,8 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
+    outDir: "dist/showcase",
     target: "es2022",
     minify: "oxc",
-    lib: {
-      entry: "src/main.ts",
-      fileName: () => "microfw.js",
-      formats: ["es"],
-    },
   },
 });

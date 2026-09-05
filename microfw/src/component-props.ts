@@ -4,26 +4,111 @@ export type PropSignal = {
   (): string | null;
   (value: string | null): void;
 };
+type Prop = {
+  name: string;
+  value: PropSignal;
+  attribute: string | null;
+  dispose?: () => void;
+};
 type PropContext = {
   host: HTMLElement;
-  props: Map<string, PropSignal>;
-  cleanup: (() => void)[];
+  props: Map<string, Prop>;
+  observer?: MutationObserver;
+};
+
+export type PropRender<Result> = {
+  result: Result;
+  reconnect: () => void;
+  dispose: () => void;
 };
 
 let currentContext: PropContext | undefined;
+function validate(value: unknown): asserts value is string | null {
+  // Empty strings and null are valid; every other non-string value is rejected.
+  if (value !== null && typeof value !== "string") {
+    throw new TypeError("Prop must be a string or null.");
+  }
+}
+
+function reconcile(context: PropContext): void {
+  for (const prop of context.props.values()) {
+    const attribute = context.host.getAttribute(prop.name);
+    if (attribute !== prop.attribute) {
+      prop.attribute = attribute;
+      prop.value(attribute);
+    }
+  }
+}
+
+function start(context: PropContext): void {
+  if (context.props.size === 0) {
+    return;
+  }
+
+  try {
+    reconcile(context);
+    for (const prop of context.props.values()) {
+      validate(prop.value());
+      prop.dispose = effect(() => {
+        const next = prop.value();
+        validate(next);
+        if (context.host.getAttribute(prop.name) !== next) {
+          if (next === null) {
+            context.host.removeAttribute(prop.name);
+          } else {
+            context.host.setAttribute(prop.name, next);
+          }
+        }
+        prop.attribute = next;
+      });
+    }
+
+    const observer = new MutationObserver(() => reconcile(context));
+    observer.observe(context.host, {
+      attributes: true,
+      attributeFilter: Array.from(context.props.keys()),
+    });
+    context.observer = observer;
+  } catch (error) {
+    stop(context);
+    throw error;
+  }
+}
+
+function stop(context: PropContext): void {
+  context.observer?.disconnect();
+  delete context.observer;
+  for (const prop of context.props.values()) {
+    prop.dispose?.();
+    delete prop.dispose;
+  }
+  reconcile(context);
+}
 
 // Nested renders restore their parent context; failed renders dispose their subscriptions.
-export function renderWithProps<Result>(host: HTMLElement, render: () => Result): Result {
+export function renderWithProps<Result>(
+  host: HTMLElement,
+  render: () => Result,
+): PropRender<Result> {
   const previousContext = currentContext;
-  const context: PropContext = { host, props: new Map(), cleanup: [] };
+  const context: PropContext = { host, props: new Map() };
   currentContext = context;
 
   try {
-    return render();
+    const result = render();
+    return {
+      result,
+      reconnect: () => {
+        if (context.observer) {
+          reconcile(context);
+        } else {
+          start(context);
+        }
+      },
+      dispose: () => stop(context),
+    };
   } catch (error) {
-    for (const dispose of context.cleanup) {
-      dispose();
-    }
+    stop(context);
     throw error;
   } finally {
     currentContext = previousContext;
@@ -34,63 +119,37 @@ export function renderWithProps<Result>(host: HTMLElement, render: () => Result)
 export function useProp(name: string): PropSignal {
   const context = currentContext;
   if (!context) {
-    throw new Error("useProp must be called synchronously inside a component render.");
+    throw new Error("useProp requires render.");
   }
   if (!/^[a-z][a-z0-9-]*$/.test(name) || name.startsWith("on")) {
-    throw new TypeError(`Invalid component prop name "${name}".`);
+    throw new TypeError("Invalid prop name.");
   }
 
   const existing = context.props.get(name);
   if (existing) {
-    return existing;
+    return existing.value;
   }
 
   const { host } = context;
   const descriptor = Object.getOwnPropertyDescriptor(host, name);
   if (descriptor && (!descriptor.configurable || !("value" in descriptor))) {
-    throw new TypeError(`Cannot replace component property "${name}".`);
+    throw new TypeError("Prop cannot be replaced.");
   }
   const initial: unknown = descriptor ? descriptor.value : host.getAttribute(name);
-  if (initial !== null && typeof initial !== "string") {
-    throw new TypeError(`Component prop "${name}" requires a string or null.`);
-  }
+  validate(initial);
 
   const value = signal<string | null>(initial);
-  context.props.set(name, value);
+  const prop: Prop = { name, value, attribute: host.getAttribute(name) };
+  context.props.set(name, prop);
   Object.defineProperty(host, name, {
     configurable: true,
     enumerable: true,
     get: value,
     set: (next: unknown) => {
-      if (next !== null && typeof next !== "string") {
-        throw new TypeError(`Component prop "${name}" requires a string or null.`);
-      }
+      validate(next);
       value(next);
     },
   });
-
-  const disposeEffect = effect(() => {
-    const next = value();
-    if (next !== null && typeof next !== "string") {
-      throw new TypeError(`Component prop "${name}" requires a string or null.`);
-    }
-    if (host.getAttribute(name) === next) {
-      return;
-    }
-    if (next === null) {
-      host.removeAttribute(name);
-    } else {
-      host.setAttribute(name, next);
-    }
-  });
-  context.cleanup.push(disposeEffect);
-
-  // Observe only this host, including while detached. Read final values to avoid feedback loops.
-  const observer = new MutationObserver(() => {
-    value(host.getAttribute(name));
-  });
-  observer.observe(host, { attributes: true, attributeFilter: [name] });
-  context.cleanup.push(() => observer.disconnect());
 
   return value;
 }
