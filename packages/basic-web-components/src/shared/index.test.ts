@@ -1,128 +1,104 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  booleanProp,
+  callbackValue,
   decorateButton,
-  partClassName,
-  defineComponent,
   enumValue,
   finiteNumber,
+  numberProp,
+  observeSlotSubtree,
   parseJsonStrings,
-  useEffects,
+  partClassName,
+  requireSlottedElement,
+  slottedElements,
+  stringProp,
 } from "./index";
 
-type HydratedProperties = {
-  defaultValue: number;
-  onChange: ((value: number) => void) | null;
-  value: number;
-};
-const hydrationProperties = {
-  value: "value",
-  defaultValue: "default-value",
-  onChange: null,
-} as const;
+describe("native slot lookup", () => {
+  it("finds direct assigned elements without crossing nested component roots", () => {
+    const host = document.createElement("div");
+    host.innerHTML = `<button slot="trigger"></button><div><button slot="trigger"></button></div>`;
 
-let tagSequence = 0;
-
-function uniqueTag(label: string): string {
-  return `bwc-runtime-${label}-${++tagSequence}`;
-}
-
-// Upgrade candidates may shadow accessors with own properties; hydration must delete them before restoring in declaration order.
-describe("component property runtime", () => {
-  afterEach(() => {
-    document.body.replaceChildren();
+    expect(slottedElements(host, "trigger", HTMLButtonElement)).toEqual([host.firstElementChild]);
+    expect(requireSlottedElement(host, "trigger", HTMLButtonElement)).toBe(host.firstElementChild);
   });
 
-  it("hydrates attribute-backed and callback-only properties assigned before upgrade", () => {
-    const tag = uniqueTag("hydrate");
-    const element = document.createElement(tag) as HTMLElement & HydratedProperties;
-    const callback = vi.fn();
-    element.value = 7;
-    element.defaultValue = 3;
-    element.onChange = callback;
-    document.body.append(element);
-
-    const assignments: string[] = [];
-    defineComponent<unknown, HTMLElement, typeof hydrationProperties>(
-      tag,
-      HTMLElement,
-      hydrationProperties,
-      (host, props, _context, properties) => {
-        let value = 0;
-        let defaultValue = 0;
-        let onChange: HydratedProperties["onChange"] = null;
-        properties.install({
-          value: {
-            get: () => value,
-            set: (next) => {
-              assignments.push(`value:${next}`);
-              value = Number(next);
-              host.setAttribute("value", String(next));
-            },
-          },
-          defaultValue: {
-            get: () => defaultValue,
-            set: (next) => {
-              assignments.push(`defaultValue:${next}`);
-              defaultValue = Number(next);
-              host.setAttribute("default-value", String(next));
-            },
-          },
-          onChange: {
-            get: () => onChange,
-            set: (next) => {
-              assignments.push("onChange");
-              onChange = next as HydratedProperties["onChange"];
-            },
-          },
-        });
-
-        expect(props.value()).toBe("7");
-        expect(props.defaultValue()).toBe("3");
-      },
+  it("rejects missing, duplicate, and wrong element types", () => {
+    const host = document.createElement("div");
+    expect(() => requireSlottedElement(host, "trigger", HTMLButtonElement)).toThrow(
+      /exactly one button/,
     );
 
-    expect(assignments).toEqual(["value:7", "defaultValue:3", "onChange"]);
-    expect(element.value).toBe(7);
-    expect(element.defaultValue).toBe(3);
-    expect(element.onChange).toBe(callback);
-    expect(Object.hasOwn(element, "value")).toBe(true);
-    expect(
-      (customElements.get(tag) as CustomElementConstructor & { observedAttributes: string[] })
-        .observedAttributes,
-    ).toEqual(["class", "value", "default-value"]);
+    host.innerHTML = `<div slot="trigger"></div>`;
+    expect(() => requireSlottedElement(host, "trigger", HTMLButtonElement)).toThrow(
+      /must be a button/,
+    );
+
+    host.innerHTML = `<button slot="trigger"></button><button slot="trigger"></button>`;
+    expect(() => requireSlottedElement(host, "trigger", HTMLButtonElement)).toThrow(
+      /exactly one button/,
+    );
+  });
+});
+
+describe("slot subtree observation", () => {
+  it("syncs initially, reacts to slot/subtree changes, and disposes", async () => {
+    const host = document.createElement("div");
+    host.attachShadow({ mode: "open" }).innerHTML = `<slot name="item"></slot>`;
+    const sync = vi.fn();
+    const dispose = observeSlotSubtree(host, sync, ["value"]);
+    expect(sync).toHaveBeenCalledOnce();
+
+    const item = document.createElement("div");
+    item.slot = "item";
+    host.append(item);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sync).toHaveBeenCalledTimes(2);
+
+    item.setAttribute("value", "changed");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sync).toHaveBeenCalledTimes(3);
+
+    dispose();
+    item.setAttribute("value", "ignored");
+    await Promise.resolve();
+    expect(sync).toHaveBeenCalledTimes(3);
   });
 
-  it("runs reactive synchronization once initially and disposes every effect", () => {
-    const reads = vi.fn();
-    const dispose = useEffects(reads, reads);
-    expect(reads).toHaveBeenCalledTimes(2);
+  it("ignores mutations caused by sync while retaining later author changes", async () => {
+    const host = document.createElement("div");
+    const item = document.createElement("div");
+    host.append(item);
+    const sync = vi.fn(() => item.setAttribute("value", "normalized"));
+    const dispose = observeSlotSubtree(host, sync, ["value"]);
 
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sync).toHaveBeenCalledOnce();
+
+    item.setAttribute("value", "author");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sync).toHaveBeenCalledTimes(2);
+    await Promise.resolve();
+    expect(sync).toHaveBeenCalledTimes(2);
     dispose();
   });
 });
 
 describe("button decoration", () => {
-  it("settles class synchronization and preserves author class updates", async () => {
+  it("preserves author classes and supplies stable interactive metadata", () => {
     const button = document.createElement("button");
-    const mutations: MutationRecord[] = [];
-    const observer = new MutationObserver((records) => mutations.push(...records));
-    observer.observe(button, { attributes: true, attributeFilter: ["class"] });
+    button.className = "author";
+    decorateButton(button, "control", "bwc-control", button.className);
 
-    decorateButton(button, "control", "bwc-control", "author");
-    await Promise.resolve();
     expect(button.className).toBe("control author");
-    expect(mutations).toHaveLength(1);
-
-    decorateButton(button, "control", "bwc-control", button.className);
-    await Promise.resolve();
-    expect(mutations).toHaveLength(1);
-
-    button.className = "updated";
-    decorateButton(button, "control", "bwc-control", button.className);
-    await Promise.resolve();
-    expect(button.className).toBe("control updated");
-    expect(mutations).toHaveLength(3);
-    observer.disconnect();
+    expect(button.dataset.testid).toBe("bwc-control");
+    expect(button.type).toBe("button");
+    expect(button.style.cursor).toBe("pointer");
+    expect(button.style.userSelect).toBe("none");
   });
 });
 
@@ -137,16 +113,32 @@ describe("part class composition", () => {
 });
 
 describe("shared input validation", () => {
-  it("validates JSON string arrays", () => {
+  it("validates JSON arrays, callbacks, finite numbers, and enums", () => {
     expect(parseJsonStrings('["a","b"]', "value")).toEqual(["a", "b"]);
     expect(() => parseJsonStrings('["a",""]', "value")).toThrow(/JSON string array/);
-    expect(() => parseJsonStrings("not-json", "value")).toThrow(/JSON string array/);
-  });
-
-  it("rejects non-finite numbers and unknown enum values", () => {
     expect(() => finiteNumber("Infinity", "offset")).toThrow(/finite/);
     expect(() => enumValue("diagonal", ["top", "bottom"] as const, "bottom", "side")).toThrow(
       /side must be one of/,
     );
+    expect(() => callbackValue(3, "onChange")).toThrow(/function or null/);
+  });
+
+  it("provides reusable strict boolean, string, and numeric prop codecs", () => {
+    const enabled = booleanProp("enabled");
+    expect(enabled.fromAttribute(null)).toBe(false);
+    expect(enabled.fromAttribute("")).toBe(true);
+    expect(enabled.toAttribute(true)).toBe("");
+    expect(enabled.toAttribute(false)).toBeNull();
+    expect(() => enabled.fromProperty("true")).toThrow(/boolean/);
+
+    const label = stringProp("label", "fallback");
+    expect(label.fromAttribute(null)).toBe("fallback");
+    expect(label.fromProperty("value")).toBe("value");
+    expect(() => label.fromProperty(1)).toThrow(/string/);
+
+    const count = numberProp("count", 2);
+    expect(count.fromAttribute(null)).toBe(2);
+    expect(count.fromAttribute("3")).toBe(3);
+    expect(() => count.fromProperty(Number.NaN)).toThrow(/finite/);
   });
 });

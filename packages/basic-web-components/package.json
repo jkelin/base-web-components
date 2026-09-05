@@ -82,7 +82,7 @@
     "format": "oxfmt --write src"
   },
   "dependencies": {
-    "alien-signals": "^3.2.1"
+    "microfw": "workspace:*"
   },
   "devDependencies": {
     "happy-dom": "^20.12.0",

@@ -1,60 +1,108 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  BWC_POPOVER_CLOSE_TAG,
-  BWC_POPOVER_POPUP_TAG,
-  BWC_POPOVER_TRIGGER_TAG,
-  BwcPopoverElement,
-} from "./index";
+import { BWC_POPOVER_TAG, type BwcPopoverElement } from "./index";
 
-type StatefulElement<State extends object> = HTMLElement & { context: () => State };
-function createHost<Element extends HTMLElement>(nativeTag: string, is: string): Element {
-  const element = document.createElement(nativeTag) as Element;
-  element.setAttribute("is", is);
-  return element;
+type PopoverElement = BwcPopoverElement;
+
+function createPopover(options: { defaultOpen?: boolean; open?: boolean } = {}) {
+  const root = document.createElement(BWC_POPOVER_TAG) as PopoverElement;
+  root.toggleAttribute("default-open", options.defaultOpen ?? false);
+  root.toggleAttribute("open", options.open ?? false);
+
+  const trigger = document.createElement("button");
+  trigger.slot = "trigger";
+  trigger.textContent = "Open";
+  const popup = document.createElement("div");
+  popup.slot = "popup";
+  const close = document.createElement("button");
+  close.dataset.close = "";
+  close.textContent = "Close";
+  popup.append(close);
+  root.append(trigger, popup);
+
+  return { close, popup, root, trigger };
 }
 
 afterEach(() => document.body.replaceChildren());
 
-describe("popover reconnects", () => {
-  it("preserves popover open state and reattaches controls", () => {
-    const root = new BwcPopoverElement() as unknown as StatefulElement<{ open: boolean }> & {
-      onOpenChange: ((open: boolean) => void) | null;
-      open: boolean;
-    };
-    const callback = vi.fn();
-    root.onOpenChange = callback;
-    const trigger = createHost<HTMLButtonElement>("button", BWC_POPOVER_TRIGGER_TAG);
-    const popup = createHost<HTMLDivElement>("div", BWC_POPOVER_POPUP_TAG);
-    const close = createHost<HTMLButtonElement>("button", BWC_POPOVER_CLOSE_TAG);
-    root.append(trigger, popup, close);
-    document.body.append(root);
-    trigger.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
-    expect(root.open).toBe(true);
-    const state = root.context();
+describe("native slot structure", () => {
+  it("requires one button trigger and one div popup", () => {
+    const root = document.createElement(BWC_POPOVER_TAG);
+    const trigger = document.createElement("button");
+    trigger.slot = "trigger";
+    const first = document.createElement("div");
+    first.slot = "popup";
+    const second = document.createElement("div");
+    second.slot = "popup";
+    root.append(trigger, first, second);
 
-    root.remove();
-    document.body.append(root);
+    expect(() => document.body.append(root)).toThrow(TypeError);
+  });
 
-    expect(root.context()).toBe(state);
-    expect(root.open).toBe(true);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(popup.hidden).toBe(false);
-    close.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+  it("rebinds dynamically replaced slots", async () => {
+    const { popup, root, trigger } = createPopover({ defaultOpen: true });
+    document.body.append(root);
+    const replacement = document.createElement("div");
+    replacement.slot = "popup";
+    popup.replaceWith(replacement);
+
+    await vi.waitFor(() => expect(replacement.hidden).toBe(false));
+    trigger.click();
     expect(root.open).toBe(false);
-    expect(callback).toHaveBeenCalledTimes(2);
   });
 });
 
-it("resets removed controlled state without reapplying the default", () => {
-  const root = new BwcPopoverElement() as HTMLElement & { open: boolean };
-  root.setAttribute("default-open", "");
-  document.body.append(root);
-  expect(root.open).toBe(true);
-  root.setAttribute("open", "");
-  expect(root.open).toBe(true);
-  root.removeAttribute("open");
-  expect(root.open).toBe(false);
+describe("state and native dismissal", () => {
+  it("preserves uncontrolled state across reconnects", () => {
+    const { close, popup, root, trigger } = createPopover();
+    const callback = vi.fn();
+    root.onOpenChange = callback;
+    document.body.append(root);
+
+    trigger.click();
+    root.remove();
+    document.body.append(root);
+    expect(root.open).toBe(true);
+    expect(popup.hidden).toBe(false);
+    close.click();
+    expect(root.open).toBe(false);
+    expect(callback.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("notifies controlled light-dismiss and restores the externally controlled state", async () => {
+    const { popup, root, trigger } = createPopover({ open: true });
+    const callback = vi.fn();
+    root.onOpenChange = callback;
+    document.body.append(root);
+
+    popup.hidden = true;
+    const toggle = new Event("toggle");
+    Object.defineProperty(toggle, "newState", { value: "closed" });
+    popup.dispatchEvent(toggle);
+    expect(root.open).toBe(true);
+    expect(callback).toHaveBeenCalledWith(false);
+    await vi.waitFor(() => expect(popup.hidden).toBe(false));
+
+    root.removeAttribute("open");
+    await vi.waitFor(() => expect(root.open).toBe(false));
+    trigger.click();
+    expect(root.open).toBe(false);
+  });
+
+  it("synchronizes uncontrolled light-dismiss and reopens", () => {
+    const { popup, root, trigger } = createPopover();
+    document.body.append(root);
+
+    trigger.click();
+    popup.hidden = true;
+    const toggle = new Event("toggle");
+    Object.defineProperty(toggle, "newState", { value: "closed" });
+    popup.dispatchEvent(toggle);
+    expect(root.open).toBe(false);
+    trigger.click();
+    expect(root.open).toBe(true);
+  });
 });
+
 describe("fixed positioning", () => {
   it.each([
     ["bottom", "translate3d(10px, 45px, 0)"],
@@ -62,12 +110,9 @@ describe("fixed positioning", () => {
     ["right", "translate3d(35px, 20px, 0)"],
     ["left", "translate3d(5px, 20px, 0) translateX(-100%)"],
   ] as const)("positions on the %s without reading popup size", (side, transform) => {
-    const root = new BwcPopoverElement() as HTMLElement & { open: boolean };
-    root.setAttribute("default-open", "");
-    root.setAttribute("side", side);
-    root.setAttribute("side-offset", "5");
-    const trigger = createHost<HTMLButtonElement>("button", BWC_POPOVER_TRIGGER_TAG);
-    const popup = createHost<HTMLDivElement>("div", BWC_POPOVER_POPUP_TAG);
+    const { popup, root, trigger } = createPopover({ defaultOpen: true });
+    root.side = side;
+    root.sideOffset = 5;
     popup.style.inset = "10px 20px 30px 40px";
     popup.style.margin = "8px";
     vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
@@ -82,62 +127,80 @@ describe("fixed positioning", () => {
       toJSON: () => ({}),
     });
     vi.spyOn(popup, "getBoundingClientRect").mockImplementation(() => {
-      throw new Error("popup getBoundingClientRect must not be read");
+      throw new Error("popup geometry must not be read");
     });
-    Object.defineProperties(popup, {
-      offsetHeight: {
-        get: () => {
-          throw new Error("offsetHeight must not be read");
-        },
-      },
-      offsetWidth: {
-        get: () => {
-          throw new Error("offsetWidth must not be read");
-        },
-      },
-    });
-    root.append(trigger, popup);
     document.body.append(root);
 
     expect(popup.style.position).toBe("fixed");
     expect(popup.style.inset).toBe("0 auto auto 0");
     expect(popup.style.margin).toBe("0px");
     expect(popup.style.transform).toBe(transform);
+    expect(popup.dataset.side).toBe(side);
+  });
+
+  it("repositions on resize and capture-scroll, then cleans listeners on disconnect", () => {
+    const { root, trigger } = createPopover({ defaultOpen: true });
+    const rect = vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      bottom: 20,
+      height: 10,
+      left: 10,
+      right: 20,
+      top: 10,
+      width: 10,
+      x: 10,
+      y: 10,
+      toJSON: () => ({}),
+    });
+    document.body.append(root);
+    const baseline = rect.mock.calls.length;
+
+    window.dispatchEvent(new Event("resize"));
+    document.dispatchEvent(new Event("scroll"));
+    expect(rect.mock.calls.length).toBe(baseline + 2);
+    root.remove();
+    window.dispatchEvent(new Event("resize"));
+    document.dispatchEvent(new Event("scroll"));
+    expect(rect.mock.calls.length).toBe(baseline + 2);
   });
 });
 
-describe("native dismissal", () => {
-  it("synchronizes uncontrolled light-dismiss and reopens on the next trigger click", () => {
-    const root = new BwcPopoverElement() as HTMLElement & {
-      onOpenChange: ((open: boolean) => void) | null;
-      open: boolean;
-    };
-    const callback = vi.fn();
-    const trigger = createHost<HTMLButtonElement>("button", BWC_POPOVER_TRIGGER_TAG);
-    const popup = createHost<HTMLDivElement>("div", BWC_POPOVER_POPUP_TAG);
-    root.onOpenChange = callback;
-    root.append(trigger, popup);
+describe("parts", () => {
+  it("preserves reactive classes and adds stable selectors, ARIA, and cursors", async () => {
+    const { close, popup, root, trigger } = createPopover();
+    trigger.className = "author-trigger";
+    popup.className = "author-popup";
+    close.className = "author-close";
+    root.triggerClass = "trigger-a";
+    root.popupClass = "popup-a";
+    root.closeClass = "close-a";
     document.body.append(root);
 
-    trigger.click();
-    expect(popup.hidden).toBe(false);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(popup.hasAttribute("data-open")).toBe(true);
+    expect(trigger.className).toBe("popover-trigger author-trigger trigger-a");
+    expect(popup.className).toBe("popover-popup author-popup popup-a");
+    expect(close.className).toBe("popover-close author-close close-a");
+    expect(trigger.id).not.toBe("");
+    expect(trigger.dataset.testid).toBe("bwc-popover-trigger");
+    expect(trigger.style.cursor).toBe("pointer");
+    expect(trigger.getAttribute("aria-controls")).toBe(popup.id);
+    expect(popup.dataset.testid).toBe("bwc-popover-popup");
+    expect(popup.getAttribute("popover")).toBe("auto");
+    expect(popup.getAttribute("role")).toBe("dialog");
+    expect(close.dataset.testid).toBe("bwc-popover-close");
 
-    popup.hidden = true;
-    const toggle = new Event("toggle");
-    Object.defineProperty(toggle, "newState", { value: "closed" });
-    popup.dispatchEvent(toggle);
-    expect(root.open).toBe(false);
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(popup.hasAttribute("data-open")).toBe(false);
-    expect(callback).toHaveBeenLastCalledWith(false);
+    root.popupClass = "popup-b";
+    popup.className = "new-author";
+    await Promise.resolve();
+    expect(popup.className).toBe("popover-popup new-author popup-b");
+  });
 
-    trigger.click();
-    expect(root.open).toBe(true);
-    expect(popup.hidden).toBe(false);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(popup.hasAttribute("data-open")).toBe(true);
-    expect(callback.mock.calls).toEqual([[true], [false], [true]]);
+  it("ignores data-close buttons owned by a nested popover", () => {
+    const outer = createPopover();
+    const inner = createPopover();
+    outer.popup.append(inner.root);
+    document.body.append(outer.root);
+    outer.trigger.click();
+
+    inner.close.click();
+    expect(outer.root.open).toBe(true);
   });
 });

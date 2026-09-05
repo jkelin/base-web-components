@@ -1,20 +1,29 @@
+import { defineComponent, effect, html, onMount, useHost, useProp } from "microfw";
 import {
-  booleanValue,
-  callbackValue,
-  decorateButton,
+  booleanProp,
+  belongsToHost,
+  callbackProp,
   createPartClassController,
-  defineComponent,
+  decorateButton,
   emit,
   nextId,
-  observeChildren,
-  useEffects,
+  observeSlotSubtree,
+  requireSlottedElement,
+  stringProp,
   type ChangeCallback,
 } from "../shared";
 
 export const BWC_MODAL_TAG = "bwc-modal";
-export const BWC_MODAL_TRIGGER_TAG = `${BWC_MODAL_TAG}-trigger`;
-export const BWC_MODAL_POPUP_TAG = `${BWC_MODAL_TAG}-popup`;
-export const BWC_MODAL_CLOSE_TAG = `${BWC_MODAL_TAG}-close`;
+
+export type BwcModalElement = HTMLElement & {
+  open: boolean;
+  defaultOpen: boolean;
+  disabled: boolean;
+  triggerClass: string;
+  popupClass: string;
+  closeClass: string;
+  onOpenChange: ChangeCallback<boolean>;
+};
 
 type DocumentScrollLock = {
   owners: Set<HTMLElement>;
@@ -26,193 +35,179 @@ const documentScrollLocks = new WeakMap<Document, DocumentScrollLock>();
 function acquireDocumentScrollLock(document: Document, owner: HTMLElement): void {
   let lock = documentScrollLocks.get(document);
   if (!lock) {
-    lock = {
-      overflow: document.documentElement.style.overflow,
-      owners: new Set(),
-    };
+    lock = { owners: new Set(), overflow: document.documentElement.style.overflow };
+    document.documentElement.style.overflow = "hidden";
     documentScrollLocks.set(document, lock);
   }
-  if (lock.owners.size === 0) document.documentElement.style.overflow = "hidden";
   lock.owners.add(owner);
 }
 
 function releaseDocumentScrollLock(document: Document, owner: HTMLElement): void {
   const lock = documentScrollLocks.get(document);
   if (!lock || !lock.owners.delete(owner) || lock.owners.size > 0) return;
-  document.documentElement.style.overflow = lock.overflow;
-  documentScrollLocks.delete(document);
+
+  try {
+    document.documentElement.style.overflow = lock.overflow;
+  } finally {
+    documentScrollLocks.delete(document);
+  }
 }
 
-type ModalApi = HTMLElement & {
-  open: boolean;
-  defaultOpen: boolean;
-  disabled: boolean;
-  triggerClass: string;
-  popupClass: string;
-  closeClass: string;
-  onOpenChange: ChangeCallback<boolean>;
-};
+export const BwcModalElement = defineComponent<BwcModalElement>(BWC_MODAL_TAG, () => {
+  const host = useHost<BwcModalElement>();
+  let controlled = host.hasAttribute("open") || Object.hasOwn(host, "open");
+  let openState = false;
+  let initialized = false;
+  let activeDialog: HTMLDialogElement | null = null;
+  let restoreFocus: HTMLElement | null = null;
+  let lockedDocument: Document | null = null;
+  const classControllers = new WeakMap<HTMLElement, (partClass?: string | null) => void>();
 
-type ModalState = {
-  classControllers: WeakMap<HTMLElement, (partClass?: string | null) => void>;
-  controlled: boolean;
-  initialized: boolean;
-  onOpenChange: ChangeCallback<boolean>;
-  open: boolean;
-};
+  const open = useProp<boolean>("open", {
+    ...booleanProp("open"),
+    get: () => openState,
+    onSet: (value, commit) => {
+      controlled = true;
+      commit(value);
+    },
+  });
+  const defaultOpen = useProp<boolean>("defaultOpen", booleanProp("default-open"));
+  const disabled = useProp<boolean>("disabled", booleanProp("disabled"));
+  const triggerClass = useProp<string>("triggerClass", stringProp("trigger-class"));
+  const popupClass = useProp<string>("popupClass", stringProp("popup-class"));
+  const closeClass = useProp<string>("closeClass", stringProp("close-class"));
+  const onOpenChange = useProp<ChangeCallback<boolean>>(
+    "onOpenChange",
+    callbackProp<boolean>("onOpenChange"),
+  );
+  openState = controlled ? open() : defaultOpen();
 
-const modalProperties = {
-  open: "open",
-  defaultOpen: "default-open",
-  disabled: "disabled",
-  onOpenChange: null,
-  triggerClass: "trigger-class",
-  popupClass: "popup-class",
-  closeClass: "close-class",
-} as const;
+  const applyPartClass = (part: HTMLElement, marker: string, value: string) => {
+    let apply = classControllers.get(part);
+    if (!apply) {
+      apply = createPartClassController(part, marker, value);
+      classControllers.set(part, apply);
+    }
+    apply(value);
+  };
 
-export const BwcModalElement = defineComponent<ModalState, HTMLElement, typeof modalProperties>(
-  BWC_MODAL_TAG,
-  HTMLElement,
-  modalProperties,
-  (element, props, context, properties) => {
-    const previous = context();
-    // Defaults initialize once; reconnects retain the last uncontrolled open state.
-    const state: ModalState =
-      "open" in previous
-        ? previous
-        : {
-            classControllers: new WeakMap(),
-            controlled: props.open() !== null,
-            initialized: false,
-            onOpenChange: null,
-            open: props.open() !== null,
-          };
-    context(state);
-    let restore: HTMLElement | null = null;
-    let lockedDocument: Document | null = null;
-    const syncScrollLock = (dialog: HTMLDialogElement | null) => {
-      const nextDocument = dialog?.open && element.isConnected ? element.ownerDocument : null;
-      if (lockedDocument === nextDocument) return;
-      if (lockedDocument) releaseDocumentScrollLock(lockedDocument, element);
-      if (nextDocument) acquireDocumentScrollLock(nextDocument, element);
-      lockedDocument = nextDocument;
-    };
-    const classControllers = state.classControllers;
-    const applyPartClass = (part: HTMLElement, marker: string, partClass: string | null) => {
-      // Controllers persist across reconnects so old part-prop tokens never become author classes.
-      let apply = classControllers.get(part);
-      if (!apply) {
-        apply = createPartClassController(part, marker, partClass);
-        classControllers.set(part, apply);
-      }
-      apply(partClass);
-    };
+  const syncScrollLock = (dialog: HTMLDialogElement | null) => {
+    const nextDocument = dialog?.open && host.isConnected ? dialog.ownerDocument : null;
+    if (lockedDocument === nextDocument) return;
+    if (lockedDocument) releaseDocumentScrollLock(lockedDocument, host);
+    if (nextDocument) acquireDocumentScrollLock(nextDocument, host);
+    lockedDocument = nextDocument;
+  };
 
-    const sync = () => {
-      if (!state.initialized) {
-        state.initialized = true;
-        if (!state.controlled) state.open = props.defaultOpen() !== null;
-      }
-      const trigger = element.querySelector<HTMLButtonElement>(
-        `button[is="${BWC_MODAL_TRIGGER_TAG}"]`,
-      );
-      const dialog = element.querySelector<HTMLDialogElement>(
-        `dialog[is="${BWC_MODAL_POPUP_TAG}"]`,
-      );
-      const close = element.querySelector<HTMLButtonElement>(`button[is="${BWC_MODAL_CLOSE_TAG}"]`);
-      if (!trigger || !dialog) {
+  const parts = () => ({
+    dialog: requireSlottedElement(host, "popup", HTMLDialogElement),
+    trigger: requireSlottedElement(host, "trigger", HTMLButtonElement),
+  });
+
+  const sync = () => {
+    let dialog: HTMLDialogElement;
+    let trigger: HTMLButtonElement;
+    try {
+      ({ dialog, trigger } = parts());
+    } catch (error) {
+      syncScrollLock(null);
+      throw error;
+    }
+    if (!initialized) {
+      initialized = true;
+      if (!controlled) openState = defaultOpen();
+    }
+    if (activeDialog && activeDialog !== dialog) {
+      try {
+        if (activeDialog.open) activeDialog.close();
+      } finally {
         syncScrollLock(null);
-        return;
       }
-      trigger.id ||= nextId(`${BWC_MODAL_TRIGGER_TAG}-button`);
-      dialog.id ||= nextId(BWC_MODAL_POPUP_TAG);
-      if (close) close.id ||= nextId(BWC_MODAL_CLOSE_TAG);
-      trigger.setAttribute("aria-haspopup", "dialog");
-      trigger.setAttribute("aria-expanded", String(state.open));
-      trigger.setAttribute("aria-controls", dialog.id);
-      trigger.disabled = props.disabled() !== null;
-      decorateButton(
-        trigger,
-        "modal-trigger",
-        BWC_MODAL_TRIGGER_TAG,
-        trigger.className.replace(/(?:^| )modal-trigger(?: |$)/g, " ").trim(),
-      );
-      applyPartClass(trigger, "modal-trigger", props.triggerClass());
-      applyPartClass(dialog, "modal-popup", props.popupClass());
-      if (close) applyPartClass(close, "modal-close", props.closeClass());
+    }
+    activeDialog = dialog;
+
+    trigger.id ||= nextId("bwc-modal-trigger-button");
+    dialog.id ||= nextId("bwc-modal-popup");
+    dialog.dataset.testid ||= "bwc-modal-popup";
+    trigger.disabled = disabled();
+    trigger.setAttribute("aria-haspopup", "dialog");
+    trigger.setAttribute("aria-controls", dialog.id);
+    decorateButton(trigger, "modal-trigger", "bwc-modal-trigger", trigger.className);
+    applyPartClass(trigger, "modal-trigger", triggerClass());
+    applyPartClass(dialog, "modal-popup", popupClass());
+
+    const closeButtons = [
+      ...dialog.querySelectorAll<HTMLButtonElement>("button[data-close]"),
+    ].filter((button) => belongsToHost(button, host));
+    for (const button of closeButtons) {
+      button.id ||= nextId("bwc-modal-close");
+      decorateButton(button, "modal-close", "bwc-modal-close", button.className);
+      applyPartClass(button, "modal-close", closeClass());
+    }
+
+    const reflectState = () => {
+      trigger.setAttribute("aria-expanded", String(openState));
       for (const node of [trigger, dialog]) {
-        node.toggleAttribute("data-open", state.open);
-        node.toggleAttribute("data-closed", !state.open);
-        node.toggleAttribute("data-disabled", props.disabled() !== null);
-      }
-      if (state.open && !dialog.open) {
-        if (typeof dialog.showModal === "function") dialog.showModal();
-        else dialog.setAttribute("open", "");
-      }
-      if (!state.open && dialog.open) {
-        if (typeof dialog.close === "function") dialog.close();
-        else dialog.removeAttribute("open");
-        restore?.focus();
-      }
-      syncScrollLock(dialog);
-    };
-
-    properties.install({
-      open: {
-        get: () => state.open,
-        set: (next) => {
-          state.controlled = true;
-          element.toggleAttribute("open", booleanValue(next, "open"));
-        },
-      },
-      defaultOpen: {
-        get: () => props.defaultOpen() !== null,
-        set: (next) => element.toggleAttribute("default-open", booleanValue(next, "defaultOpen")),
-      },
-      disabled: {
-        get: () => props.disabled() !== null,
-        set: (next) => element.toggleAttribute("disabled", booleanValue(next, "disabled")),
-      },
-      triggerClass: {
-        get: () => props.triggerClass() ?? "",
-        set: (next) => element.setAttribute("trigger-class", String(next)),
-      },
-      popupClass: {
-        get: () => props.popupClass() ?? "",
-        set: (next) => element.setAttribute("popup-class", String(next)),
-      },
-      closeClass: {
-        get: () => props.closeClass() ?? "",
-        set: (next) => element.setAttribute("close-class", String(next)),
-      },
-      onOpenChange: {
-        get: () => state.onOpenChange,
-        set: (next) => {
-          state.onOpenChange = callbackValue<boolean>(next, "onOpenChange");
-        },
-      },
-    });
-
-    const requestOpen = (next: boolean) => {
-      if (props.disabled() !== null || next === state.open) return;
-      emit(element, state.onOpenChange, "open-change", "open", next);
-      if (!state.controlled) {
-        state.open = next;
-        sync();
+        node.toggleAttribute("data-open", openState);
+        node.toggleAttribute("data-closed", !openState);
+        node.toggleAttribute("data-disabled", disabled());
       }
     };
+    reflectState();
+
+    if (openState && !dialog.open) {
+      try {
+        dialog.showModal();
+      } catch (error) {
+        openState = false;
+        reflectState();
+        syncScrollLock(null);
+        throw error;
+      }
+    } else if (!openState && dialog.open) {
+      dialog.close();
+      restoreFocus?.focus();
+    }
+    syncScrollLock(dialog);
+  };
+
+  const requestOpen = (next: boolean) => {
+    if (disabled() || next === openState) return;
+    emit(host, onOpenChange(), "open-change", "open", next);
+    if (controlled) return;
+
+    openState = next;
+    try {
+      sync();
+    } catch (error) {
+      openState = !next;
+      syncScrollLock(null);
+      throw error;
+    }
+  };
+
+  onMount(() => {
+    // Validate cardinality and native host types before creating effects or listeners.
+    parts();
+    let stopObserver: (() => void) | undefined;
+    let stopEffect: (() => void) | undefined;
+
     const click = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest(`button[is="${BWC_MODAL_TRIGGER_TAG}"]`)) {
-        restore = target instanceof HTMLElement ? target : null;
+      const { dialog, trigger } = parts();
+      if (trigger.contains(target)) {
+        restoreFocus = trigger;
         requestOpen(true);
+        return;
       }
-      if (target.closest(`button[is="${BWC_MODAL_CLOSE_TAG}"]`)) requestOpen(false);
-      const dialog = element.querySelector<HTMLDialogElement>(
-        `dialog[is="${BWC_MODAL_POPUP_TAG}"]`,
-      );
+
+      const close = target.closest<HTMLButtonElement>("button[data-close]");
+      if (close && belongsToHost(close, host)) {
+        requestOpen(false);
+        return;
+      }
+
       if (target === dialog) {
         const rect = dialog.getBoundingClientRect();
         if (
@@ -225,71 +220,63 @@ export const BwcModalElement = defineComponent<ModalState, HTMLElement, typeof m
         }
       }
     };
+    const cancel = (event: Event) => {
+      const { dialog } = parts();
+      if (event.target !== dialog) return;
+      event.preventDefault();
+      requestOpen(false);
+    };
     const close = (event: Event) => {
-      const dialog = element.querySelector<HTMLDialogElement>(
-        `dialog[is="${BWC_MODAL_POPUP_TAG}"]`,
-      );
-      // Programmatic closes happen after uncontrolled state changes; ignore their close event.
-      if (event.target === dialog) syncScrollLock(null);
-      if (event.target !== dialog || !state.open) return;
-      emit(element, state.onOpenChange, "open-change", "open", false);
-      if (state.controlled) {
-        sync();
+      const { dialog } = parts();
+      if (event.target !== dialog || !openState) return;
+      syncScrollLock(null);
+      emit(host, onOpenChange(), "open-change", "open", false);
+      if (controlled) {
+        queueMicrotask(() => {
+          if (host.isConnected && openState) sync();
+        });
       } else {
-        state.open = false;
+        openState = false;
+        restoreFocus?.focus();
         sync();
       }
     };
-    element.addEventListener("click", click);
-    element.addEventListener("close", close, true);
-    const observer = observeChildren(element, sync);
-    const dispose = useEffects(() => {
-      const controlledOpen = props.open();
-      if (controlledOpen !== null) {
-        state.controlled = true;
-        state.open = true;
-      } else if (state.controlled) {
-        state.open = false;
-      }
-      sync();
-    });
-
-    return {
-      disconnect() {
-        dispose();
-        element.removeEventListener("click", click);
-        element.removeEventListener("close", close, true);
-        observer.disconnect();
+    const cleanup = () => {
+      stopObserver?.();
+      stopEffect?.();
+      host.removeEventListener("click", click);
+      host.removeEventListener("cancel", cancel, true);
+      host.removeEventListener("close", close, true);
+      try {
+        if (activeDialog?.open) activeDialog.close();
+      } finally {
+        activeDialog = null;
         syncScrollLock(null);
-      },
+      }
     };
-  },
-  () => {
-    const emptyProperties = {} as const;
-    defineComponent<unknown, HTMLButtonElement, typeof emptyProperties>(
-      "trigger",
-      HTMLButtonElement,
-      emptyProperties,
-      (element) => {
-        decorateButton(element, "modal-trigger", BWC_MODAL_TRIGGER_TAG, element.className);
-      },
-    );
-    defineComponent<unknown, HTMLDialogElement, typeof emptyProperties>(
-      "popup",
-      HTMLDialogElement,
-      emptyProperties,
-      (element) => {
-        element.classList.add("modal-popup");
-        element.dataset.testid ||= BWC_MODAL_POPUP_TAG;
-      },
-    );
-    defineComponent<unknown, HTMLButtonElement, typeof emptyProperties>(
-      "close",
-      HTMLButtonElement,
-      emptyProperties,
-      (element) => {
-        decorateButton(element, "modal-close", BWC_MODAL_CLOSE_TAG, element.className);
-      },
-    );
-  },
-) as unknown as { new (): ModalApi };
+
+    try {
+      sync();
+      host.addEventListener("click", click);
+      host.addEventListener("cancel", cancel, true);
+      host.addEventListener("close", close, true);
+      stopEffect = effect(() => {
+        const next = open();
+        if (next) {
+          controlled = true;
+          openState = true;
+        } else if (controlled) {
+          openState = false;
+        }
+        sync();
+      });
+      stopObserver = observeSlotSubtree(host, sync, ["class", "data-close"]);
+      return cleanup;
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+  });
+
+  return html`<slot name="trigger"></slot><slot name="popup"></slot>`;
+});

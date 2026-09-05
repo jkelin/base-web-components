@@ -1,64 +1,267 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  BWC_ACCORDION_ITEM_TAG,
-  BWC_ACCORDION_PANEL_TAG,
-  BWC_ACCORDION_TRIGGER_TAG,
-  BwcAccordionElement,
-} from "./index";
+import { BWC_ACCORDION_TAG, BwcAccordionElement } from "./index";
 
-type StatefulElement<State extends object> = HTMLElement & { context: () => State };
-function createHost<Element extends HTMLElement>(nativeTag: string, is: string): Element {
-  const element = document.createElement(nativeTag) as Element;
-  element.setAttribute("is", is);
-  return element;
+type AccordionApi = HTMLElement & {
+  value: string[];
+  defaultValue: string[];
+  multiple: boolean;
+  disabled: boolean;
+  onValueChange: ((value: string[]) => void) | null;
+};
+
+type AccordionItem = {
+  details: HTMLDetailsElement;
+  summary: HTMLElement;
+  panel: HTMLElement;
+};
+
+function item(value: string, disabled = false): AccordionItem {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const panel = document.createElement("div");
+  details.slot = "item";
+  details.dataset.value = value;
+  details.toggleAttribute("disabled", disabled);
+  summary.textContent = `${value} title`;
+  panel.textContent = `${value} content`;
+  details.append(summary, panel);
+  return { details, summary, panel };
 }
 
-afterEach(() => document.body.replaceChildren());
+function accordion(...items: AccordionItem[]): AccordionApi {
+  const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+  root.append(...items.map(({ details }) => details));
+  document.body.append(root);
+  return root;
+}
 
-describe("accordion reconnects", () => {
-  it("preserves accordion expanded values and reattaches delegation", () => {
-    const root = new BwcAccordionElement() as unknown as StatefulElement<{
-      value: string[];
-    }> & {
-      defaultValue: string[];
-      onValueChange: ((value: string[]) => void) | null;
-      value: string[];
-    };
-    const callback = vi.fn();
-    root.defaultValue = ["one"];
-    root.onValueChange = callback;
+async function settle(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
-    const item = document.createElement(BWC_ACCORDION_ITEM_TAG);
-    item.setAttribute("value", "two");
-    const trigger = createHost<HTMLButtonElement>("button", BWC_ACCORDION_TRIGGER_TAG);
-    const panel = document.createElement(BWC_ACCORDION_PANEL_TAG);
-    item.append(trigger, panel);
-    root.append(item);
+async function toggle(details: HTMLDetailsElement, open: boolean): Promise<void> {
+  details.open = open;
+  details.dispatchEvent(new Event("toggle"));
+  await settle();
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+});
+
+describe("native accordion", () => {
+  it("projects direct details items and initializes the default exactly once", async () => {
+    const one = item("one");
+    const two = item("two");
+    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    root.defaultValue = ["two"];
+    root.append(one.details, two.details);
     document.body.append(root);
-    trigger.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    await settle();
+
+    expect(root.shadowRoot?.querySelector('slot[name="item"]')).not.toBeNull();
     expect(root.value).toEqual(["two"]);
-    const state = root.context();
+    expect(one.details.open).toBe(false);
+    expect(two.details.open).toBe(true);
+    expect(two.details.hasAttribute("data-open")).toBe(true);
+    expect(two.summary.hasAttribute("data-open")).toBe(true);
+    expect(two.panel.hasAttribute("data-open")).toBe(true);
+
+    root.defaultValue = ["one"];
+    await settle();
+    expect(root.value).toEqual(["two"]);
+  });
+
+  it("uses native toggles for single and multiple uncontrolled values", async () => {
+    const one = item("one");
+    const two = item("two");
+    const root = accordion(one, two);
+    const changes = vi.fn();
+    root.onValueChange = changes;
+
+    await toggle(one.details, true);
+    expect(root.value).toEqual(["one"]);
+    expect(changes).toHaveBeenLastCalledWith(["one"]);
+
+    await toggle(two.details, true);
+    expect(root.value).toEqual(["two"]);
+    expect(one.details.open).toBe(false);
+
+    root.multiple = true;
+    await toggle(one.details, true);
+    expect(root.value).toEqual(["two", "one"]);
+    expect(one.details.open).toBe(true);
+    expect(two.details.open).toBe(true);
+  });
+
+  it("emits a composed change after the native state changes", async () => {
+    const one = item("one");
+    const root = accordion(one);
+    const order: string[] = [];
+    root.onValueChange = () => order.push(`callback:${one.details.open}`);
+    document.body.addEventListener(
+      "value-change",
+      (event) => {
+        order.push(`event:${(event as CustomEvent<{ value: string[] }>).detail.value.join()}`);
+      },
+      { once: true },
+    );
+
+    await toggle(one.details, true);
+
+    expect(order).toEqual(["callback:true", "event:one"]);
+  });
+
+  it("keeps controlled state authoritative and resets when control is removed", async () => {
+    const one = item("one");
+    const two = item("two");
+    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    root.defaultValue = ["one"];
+    root.value = ["two"];
+    root.append(one.details, two.details);
+    document.body.append(root);
+    const changes = vi.fn();
+    root.onValueChange = changes;
+    await settle();
+
+    await toggle(one.details, true);
+    expect(changes).toHaveBeenCalledWith(["one"]);
+    expect(root.value).toEqual(["two"]);
+    expect(one.details.open).toBe(false);
+    expect(two.details.open).toBe(true);
+
+    root.removeAttribute("value");
+    await settle();
+    expect(root.value).toEqual([]);
+    expect(one.details.open).toBe(false);
+    expect(two.details.open).toBe(false);
+  });
+
+  it("blocks root and item disabled toggles and exposes disabled affordances", async () => {
+    const one = item("one", true);
+    const two = item("two");
+    const root = accordion(one, two);
+    const changes = vi.fn();
+    root.onValueChange = changes;
+    await settle();
+
+    await toggle(one.details, true);
+    expect(root.value).toEqual([]);
+    expect(one.details.open).toBe(false);
+    expect(one.summary.style.cursor).toBe("not-allowed");
+    expect(one.summary.getAttribute("aria-disabled")).toBe("true");
+
+    root.disabled = true;
+    await settle();
+    await toggle(two.details, true);
+    expect(root.value).toEqual([]);
+    expect(two.details.open).toBe(false);
+    expect(two.summary.style.cursor).toBe("not-allowed");
+    expect(changes).not.toHaveBeenCalled();
+  });
+
+  it("validates unique nonempty direct item values and single values", () => {
+    const empty = item("");
+    expect(() => accordion(empty)).toThrow(/unique and nonempty/);
+    document.body.replaceChildren();
+
+    const duplicateOne = item("same");
+    const duplicateTwo = item("same");
+    expect(() => accordion(duplicateOne, duplicateTwo)).toThrow(/unique and nonempty/);
+    document.body.replaceChildren();
+
+    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    root.multiple = false;
+    expect(() => {
+      root.value = ["one", "two"];
+    }).toThrow(/at most one/);
+  });
+
+  it("reacts to direct item additions, removals, values, and disabled state", async () => {
+    const one = item("one");
+    const root = accordion(one);
+    await settle();
+
+    const two = item("two");
+    root.append(two.details);
+    await settle();
+    await toggle(two.details, true);
+    expect(root.value).toEqual(["two"]);
+
+    two.details.dataset.value = "renamed";
+    await settle();
+    expect(root.value).toEqual(["two"]);
+    expect(two.details.open).toBe(false);
+
+    two.details.toggleAttribute("disabled", true);
+    await settle();
+    expect(two.summary.style.cursor).toBe("not-allowed");
+
+    two.details.remove();
+    await settle();
+    expect(root.value).toEqual(["two"]);
+  });
+
+  it("preserves uncontrolled state and restores listeners on reconnect", async () => {
+    const one = item("one");
+    const two = item("two");
+    const root = accordion(one, two);
+    root.defaultValue = ["one"];
+    const changes = vi.fn();
+    root.onValueChange = changes;
+    await settle();
+    await toggle(two.details, true);
 
     root.remove();
     document.body.append(root);
+    await settle();
 
-    expect(root.context()).toBe(state);
     expect(root.value).toEqual(["two"]);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(panel.hidden).toBe(false);
-    trigger.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    expect(two.details.open).toBe(true);
+    await toggle(two.details, false);
     expect(root.value).toEqual([]);
-    expect(callback).toHaveBeenCalledTimes(2);
+    expect(changes).toHaveBeenCalledTimes(2);
+  });
+
+  it("decorates each interactive summary without making meaningful content unselectable", async () => {
+    const one = item("one");
+    accordion(one);
+    await settle();
+
+    expect(one.summary.dataset.testid).toBeTruthy();
+    expect(one.summary.id || one.summary.className).toBeTruthy();
+    expect(one.summary.style.cursor).toBe("pointer");
+    expect(one.summary.style.userSelect).not.toBe("none");
+    expect(one.panel.style.userSelect).not.toBe("none");
+  });
+  it("does not retain toggle listeners when observer setup fails", () => {
+    const NativeMutationObserver = MutationObserver;
+    let constructions = 0;
+    class FailingMutationObserver extends NativeMutationObserver {
+      constructor(callback: MutationCallback) {
+        super(callback);
+        constructions += 1;
+        if (constructions === 2) throw new Error("observer setup failed");
+      }
+    }
+    vi.stubGlobal("MutationObserver", FailingMutationObserver);
+    const one = item("one");
+    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    const changes = vi.fn();
+    root.onValueChange = changes;
+    root.append(one.details);
+
+    expect(() => document.body.append(root)).toThrow("observer setup failed");
+    vi.unstubAllGlobals();
+    one.details.open = true;
+    one.details.dispatchEvent(new Event("toggle"));
+
+    expect(changes).not.toHaveBeenCalled();
   });
 });
 
-it("resets removed controlled state without reapplying the default", () => {
-  const root = new BwcAccordionElement() as HTMLElement & { value: string[] };
-  root.setAttribute("default-value", '["one"]');
-  document.body.append(root);
-  expect(root.value).toEqual(["one"]);
-  root.setAttribute("value", '["two"]');
-  expect(root.value).toEqual(["two"]);
-  root.removeAttribute("value");
-  expect(root.value).toEqual([]);
+it("retains a constructible root export", () => {
+  expect(new BwcAccordionElement()).toBeInstanceOf(HTMLElement);
 });

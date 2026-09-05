@@ -2,7 +2,21 @@
   "name": "microfw",
   "version": "1.0.0",
   "private": true,
+  "files": [
+    "dist",
+    "src"
+  ],
   "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/main.ts",
+      "source": "./src/main.ts",
+      "development": "./src/main.ts",
+      "import": "./dist/microfw.js",
+      "default": "./dist/microfw.js"
+    }
+  },
   "scripts": {
     "dev": "vite --config vite.showcase.config.ts",
     "preview": "vite preview --config vite.showcase.config.ts",

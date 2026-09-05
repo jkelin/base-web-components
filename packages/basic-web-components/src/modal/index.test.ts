@@ -1,16 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  BWC_MODAL_CLOSE_TAG,
-  BWC_MODAL_POPUP_TAG,
-  BWC_MODAL_TRIGGER_TAG,
-  BwcModalElement,
-} from "./index";
+import { BWC_MODAL_TAG, type BwcModalElement } from "./index";
 
-type StatefulElement<State extends object> = HTMLElement & { context: () => State };
-function createHost<Element extends HTMLElement>(nativeTag: string, is: string): Element {
-  const element = document.createElement(nativeTag) as Element;
-  element.setAttribute("is", is);
-  return element;
+type ModalElement = BwcModalElement;
+
+function createModal(options: { defaultOpen?: boolean; open?: boolean } = {}) {
+  const root = document.createElement(BWC_MODAL_TAG) as ModalElement;
+  root.toggleAttribute("default-open", options.defaultOpen ?? false);
+  root.toggleAttribute("open", options.open ?? false);
+
+  const trigger = document.createElement("button");
+  trigger.slot = "trigger";
+  trigger.textContent = "Open";
+  const popup = document.createElement("dialog");
+  popup.slot = "popup";
+  const close = document.createElement("button");
+  close.dataset.close = "";
+  close.textContent = "Close";
+  popup.append(close);
+  root.append(trigger, popup);
+
+  return { close, popup, root, trigger };
 }
 
 afterEach(() => {
@@ -18,73 +27,79 @@ afterEach(() => {
   document.documentElement.style.overflow = "";
 });
 
-describe("modal reconnects", () => {
-  it("preserves modal open state and reattaches controls", () => {
-    const root = new BwcModalElement() as unknown as StatefulElement<{ open: boolean }> & {
-      onOpenChange: ((open: boolean) => void) | null;
-      open: boolean;
-    };
-    const callback = vi.fn();
-    root.onOpenChange = callback;
-    const trigger = createHost<HTMLButtonElement>("button", BWC_MODAL_TRIGGER_TAG);
-    const popup = createHost<HTMLDialogElement>("dialog", BWC_MODAL_POPUP_TAG);
-    const close = createHost<HTMLButtonElement>("button", BWC_MODAL_CLOSE_TAG);
-    root.append(trigger, popup, close);
-    document.body.append(root);
-    trigger.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
-    expect(root.open).toBe(true);
-    expect(document.documentElement.style.overflow).toBe("hidden");
-    const state = root.context();
+describe("native slot structure", () => {
+  it("requires one button trigger and one dialog popup", () => {
+    const root = document.createElement(BWC_MODAL_TAG);
+    const trigger = document.createElement("div");
+    trigger.slot = "trigger";
+    const popup = document.createElement("dialog");
+    popup.slot = "popup";
+    root.append(trigger, popup);
 
-    root.remove();
-    expect(document.documentElement.style.overflow).toBe("");
+    expect(() => document.body.append(root)).toThrow(TypeError);
+  });
+
+  it("rebinds replacement slots without dropping an active lock", async () => {
+    const { popup, root, trigger } = createModal();
     document.body.append(root);
+    trigger.click();
     expect(document.documentElement.style.overflow).toBe("hidden");
 
-    expect(root.context()).toBe(state);
-    expect(root.open).toBe(true);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(popup.open).toBe(true);
-    close.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
-    expect(root.open).toBe(false);
-    expect(document.documentElement.style.overflow).toBe("");
-    expect(callback).toHaveBeenCalledTimes(2);
+    const replacement = document.createElement("dialog");
+    replacement.slot = "popup";
+    popup.replaceWith(replacement);
+
+    await vi.waitFor(() => expect(replacement.open).toBe(true));
+    expect(popup.open).toBe(false);
+    expect(document.documentElement.style.overflow).toBe("hidden");
   });
 });
 
-it("resets removed controlled state without reapplying the default", () => {
-  const root = new BwcModalElement() as HTMLElement & { open: boolean };
-  root.setAttribute("default-open", "");
-  document.body.append(root);
-  expect(root.open).toBe(true);
-  root.setAttribute("open", "");
-  expect(root.open).toBe(true);
-  root.removeAttribute("open");
-  expect(root.open).toBe(false);
-});
-
-describe("document scroll locking", () => {
-  it("restores prior inline overflow after native close", async () => {
-    document.documentElement.style.overflow = "clip";
-    const root = new BwcModalElement() as HTMLElement & { open: boolean };
-    const trigger = createHost<HTMLButtonElement>("button", BWC_MODAL_TRIGGER_TAG);
-    const popup = createHost<HTMLDialogElement>("dialog", BWC_MODAL_POPUP_TAG);
-    root.append(trigger, popup);
+describe("state and native dismissal", () => {
+  it("preserves uncontrolled state across reconnects and reattaches controls", () => {
+    const { close, popup, root, trigger } = createModal();
+    const callback = vi.fn();
+    root.onOpenChange = callback;
     document.body.append(root);
 
     trigger.click();
+    root.remove();
+    expect(document.documentElement.style.overflow).toBe("");
+    document.body.append(root);
+
+    expect(root.open).toBe(true);
+    expect(popup.open).toBe(true);
     expect(document.documentElement.style.overflow).toBe("hidden");
-    popup.close();
-    await Promise.resolve();
+    close.click();
     expect(root.open).toBe(false);
-    expect(document.documentElement.style.overflow).toBe("clip");
+    expect(callback.mock.calls).toEqual([[true], [false]]);
   });
 
-  it("unlocks after backdrop dismissal", () => {
-    document.documentElement.style.overflow = "scroll";
-    const root = new BwcModalElement() as HTMLElement & { open: boolean };
-    const trigger = createHost<HTMLButtonElement>("button", BWC_MODAL_TRIGGER_TAG);
-    const popup = createHost<HTMLDialogElement>("dialog", BWC_MODAL_POPUP_TAG);
+  it("notifies controlled interactions without changing state until the attribute changes", async () => {
+    const { close, popup, root, trigger } = createModal({ open: true });
+    const callback = vi.fn();
+    root.onOpenChange = callback;
+    const changes: boolean[] = [];
+    root.addEventListener("open-change", (event: Event) => {
+      changes.push((event as CustomEvent<{ open: boolean }>).detail.open);
+    });
+    document.body.append(root);
+
+    close.click();
+    expect(root.open).toBe(true);
+    expect(popup.open).toBe(true);
+    expect(callback).toHaveBeenCalledWith(false);
+    expect(changes).toEqual([false]);
+
+    root.removeAttribute("open");
+    await vi.waitFor(() => expect(root.open).toBe(false));
+    expect(popup.open).toBe(false);
+    trigger.click();
+    expect(root.open).toBe(false);
+  });
+
+  it("handles cancel and backdrop dismissal and restores trigger focus", () => {
+    const { popup, root, trigger } = createModal();
     vi.spyOn(popup, "getBoundingClientRect").mockReturnValue({
       bottom: 30,
       height: 20,
@@ -96,108 +111,98 @@ describe("document scroll locking", () => {
       y: 10,
       toJSON: () => ({}),
     });
-    root.append(trigger, popup);
     document.body.append(root);
+
+    trigger.click();
+    const cancel = new Event("cancel", { cancelable: true });
+    popup.dispatchEvent(cancel);
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(root.open).toBe(false);
+    expect(document.activeElement).toBe(trigger);
 
     trigger.click();
     popup.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 0, clientY: 0 }));
     expect(root.open).toBe(false);
-    expect(document.documentElement.style.overflow).toBe("scroll");
   });
-  it("keeps scrolling locked until every open modal releases ownership", () => {
-    document.documentElement.style.overflow = "auto";
-    const createModal = () => {
-      const root = new BwcModalElement() as HTMLElement & { open: boolean };
-      const trigger = createHost<HTMLButtonElement>("button", BWC_MODAL_TRIGGER_TAG);
-      const popup = createHost<HTMLDialogElement>("dialog", BWC_MODAL_POPUP_TAG);
-      const close = createHost<HTMLButtonElement>("button", BWC_MODAL_CLOSE_TAG);
-      root.append(trigger, popup, close);
-      document.body.append(root);
-      return { close, root, trigger };
-    };
+
+  it("synchronizes a native close and can reopen", () => {
+    const { popup, root, trigger } = createModal();
+    document.body.append(root);
+
+    trigger.click();
+    popup.close();
+    expect(root.open).toBe(false);
+    trigger.click();
+    expect(popup.open).toBe(true);
+  });
+});
+
+describe("document scroll locking", () => {
+  it("restores prior overflow after the last owner closes", () => {
+    document.documentElement.style.overflow = "clip";
     const first = createModal();
     const second = createModal();
+    document.body.append(first.root, second.root);
 
     first.trigger.click();
     second.trigger.click();
     first.close.click();
     expect(document.documentElement.style.overflow).toBe("hidden");
     second.close.click();
-    expect(document.documentElement.style.overflow).toBe("auto");
+    expect(document.documentElement.style.overflow).toBe("clip");
   });
-});
 
-describe("native dismissal", () => {
-  it("synchronizes an uncontrolled native close and reopens on the next trigger click", async () => {
-    const root = new BwcModalElement() as HTMLElement & {
-      onOpenChange: ((open: boolean) => void) | null;
-      open: boolean;
-    };
-    const callback = vi.fn();
-    const trigger = createHost<HTMLButtonElement>("button", BWC_MODAL_TRIGGER_TAG);
-    const popup = createHost<HTMLDialogElement>("dialog", BWC_MODAL_POPUP_TAG);
-    root.onOpenChange = callback;
-    root.append(trigger, popup);
+  it("does not leak a lock when showModal fails and permits retry", () => {
+    const { popup, root, trigger } = createModal();
+    const showModal = vi.spyOn(popup, "showModal");
+    showModal.mockImplementationOnce(() => {
+      throw new DOMException("failed", "InvalidStateError");
+    });
     document.body.append(root);
 
-    trigger.click();
-    expect(popup.open).toBe(true);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(popup.hasAttribute("data-open")).toBe(true);
-
-    popup.close();
-    await Promise.resolve();
+    expect(() => trigger.click()).toThrow(DOMException);
     expect(root.open).toBe(false);
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(popup.hasAttribute("data-open")).toBe(false);
-    expect(callback).toHaveBeenLastCalledWith(false);
-
+    expect(document.documentElement.style.overflow).toBe("");
     trigger.click();
     expect(root.open).toBe(true);
-    expect(popup.open).toBe(true);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(popup.hasAttribute("data-open")).toBe(true);
-    expect(callback.mock.calls).toEqual([[true], [false], [true]]);
+    expect(document.documentElement.style.overflow).toBe("hidden");
   });
 });
 
-describe("part classes", () => {
-  it("reactively composes part props with authored classes without token growth", async () => {
-    const root = new BwcModalElement() as HTMLElement & {
-      triggerClass: string;
-      popupClass: string;
-      closeClass: string;
-    };
-    root.id = "consumer-modal";
-    root.className = "consumer";
-    root.setAttribute("trigger-class", "trigger-a");
-    root.setAttribute("popup-class", "popup-a");
-    root.setAttribute("close-class", "close-a");
-    const trigger = createHost<HTMLButtonElement>("button", BWC_MODAL_TRIGGER_TAG);
-    const popup = createHost<HTMLDialogElement>("dialog", BWC_MODAL_POPUP_TAG);
-    const close = createHost<HTMLButtonElement>("button", BWC_MODAL_CLOSE_TAG);
+describe("parts", () => {
+  it("preserves author classes and reacts without token growth", async () => {
+    const { close, popup, root, trigger } = createModal();
     trigger.className = "author-trigger";
     popup.className = "author-popup";
     close.className = "author-close";
-    root.append(trigger, popup, close);
+    root.triggerClass = "trigger-a";
+    root.popupClass = "popup-a";
+    root.closeClass = "close-a";
     document.body.append(root);
 
-    expect(root.id).toBe("consumer-modal");
-    expect(root.className).toBe("consumer");
     expect(trigger.className).toBe("modal-trigger author-trigger trigger-a");
     expect(popup.className).toBe("modal-popup author-popup popup-a");
     expect(close.className).toBe("modal-close author-close close-a");
+    expect(trigger.id).not.toBe("");
+    expect(trigger.dataset.testid).toBe("bwc-modal-trigger");
+    expect(trigger.style.cursor).toBe("pointer");
+    expect(popup.dataset.testid).toBe("bwc-modal-popup");
+    expect(close.dataset.testid).toBe("bwc-modal-close");
 
     root.triggerClass = "trigger-b";
-    root.popupClass = "popup-b";
-    root.closeClass = "close-b";
-    await Promise.resolve();
-    expect(trigger.className).toBe("modal-trigger author-trigger trigger-b");
-    expect(popup.className).toBe("modal-popup author-popup popup-b");
-    expect(close.className).toBe("modal-close author-close close-b");
-
     trigger.className = "new-author";
     await Promise.resolve();
     expect(trigger.className).toBe("modal-trigger new-author trigger-b");
+  });
+
+  it("ignores data-close buttons owned by a nested modal", () => {
+    const outer = createModal();
+    const inner = createModal();
+    outer.popup.append(inner.root);
+    document.body.append(outer.root);
+    outer.trigger.click();
+
+    inner.close.click();
+    expect(outer.root.open).toBe(true);
   });
 });

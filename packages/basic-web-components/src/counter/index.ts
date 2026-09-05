@@ -1,17 +1,27 @@
-import { signal } from "alien-signals";
 import {
-  callbackValue,
-  decorateButton,
   defineComponent,
-  emit,
-  useEffects,
+  effect,
+  html,
+  onMount,
+  signal,
+  useHost,
+  useProp,
   type Signal,
+} from "microfw";
+import {
+  callbackProp,
+  decorateButton,
+  emit,
+  observeSlotSubtree,
+  partClassName,
+  requireSlottedElement,
+  type ChangeCallback,
 } from "../shared";
 
 export const BWC_COUNTER_TAG = "bwc-counter";
-export const BWC_COUNTER_MINUS_TAG = `${BWC_COUNTER_TAG}-minus-button`;
-export const BWC_COUNTER_LABEL_TAG = `${BWC_COUNTER_TAG}-label`;
-export const BWC_COUNTER_PLUS_TAG = `${BWC_COUNTER_TAG}-plus-button`;
+const DECREMENT_TEST_ID = "bwc-counter-minus-button";
+const OUTPUT_TEST_ID = "bwc-counter-label";
+const INCREMENT_TEST_ID = "bwc-counter-plus-button";
 
 export function parseCounterValue(raw: unknown): number {
   const number =
@@ -19,147 +29,128 @@ export function parseCounterValue(raw: unknown): number {
   return Number.isFinite(number) ? Math.trunc(number) : 0;
 }
 
-type CounterContext = {
-  count: Signal<number>;
-  controlled: boolean;
-  initialized: boolean;
-  onChange: ((value: number) => void) | null;
+type CounterApi = HTMLElement & {
+  defaultValue: number;
+  onChange: ChangeCallback<number>;
+  value: number;
 };
-const counterProperties = {
-  value: "value",
-  defaultValue: "default-value",
-  onChange: null,
-} as const;
 
-export const BwcCounterElement = defineComponent<
-  CounterContext,
-  HTMLElement,
-  typeof counterProperties
->(
-  BWC_COUNTER_TAG,
-  HTMLElement,
-  counterProperties,
-  (element, props, context, properties) => {
-    const previous = context();
-    // The context signal outlives each connection; only initialize state for the first connection.
-    const state: CounterContext =
-      "count" in previous
-        ? previous
-        : {
-            count: signal(
-              props.value() !== null
-                ? parseCounterValue(props.value())
-                : parseCounterValue(props.defaultValue()),
-            ),
-            controlled: props.value() !== null,
-            initialized: false,
-            onChange: null,
-          };
-    const { count } = state;
-    context(state);
+type CounterState = {
+  controlled: boolean;
+  count: Signal<number>;
+  initialized: boolean;
+};
 
-    properties.install({
-      defaultValue: {
-        get: () => parseCounterValue(props.defaultValue()),
-        set: (value) => element.setAttribute("default-value", String(parseCounterValue(value))),
-      },
-      value: {
-        get: () => count(),
-        set: (value) => {
-          state.controlled = true;
-          element.setAttribute("value", String(parseCounterValue(value)));
-        },
-      },
-      onChange: {
-        get: () => state.onChange,
-        set: (callback) => {
-          state.onChange = callbackValue<number>(callback, "onChange");
-        },
-      },
+const counterValueCodec = {
+  defaultValue: 0,
+  fromAttribute: parseCounterValue,
+  fromProperty: parseCounterValue,
+  toAttribute: String,
+};
+
+export const BwcCounterElement = defineComponent<CounterApi>(BWC_COUNTER_TAG, () => {
+  const host = useHost<CounterApi>();
+  const state: CounterState = {
+    controlled: false,
+    count: signal(0),
+    initialized: false,
+  };
+  const defaultValue = useProp("defaultValue", {
+    ...counterValueCodec,
+    attribute: "default-value",
+  });
+  const value = useProp("value", {
+    ...counterValueCodec,
+    attribute: "value",
+    get: () => state.count(),
+    onSet(next, commit) {
+      state.controlled = true;
+      state.count(next);
+      commit(next);
+    },
+  });
+  const onChange = useProp("onChange", callbackProp<number>("onChange"));
+
+  if (!state.controlled) {
+    state.controlled = host.hasAttribute("value");
+    state.count(state.controlled ? value() : defaultValue());
+  }
+
+  onMount(() => {
+    let decrement: HTMLButtonElement | undefined;
+    let increment: HTMLButtonElement | undefined;
+    let output: HTMLOutputElement | undefined;
+    const click = (event: MouseEvent) => {
+      const path = event.composedPath();
+      const delta =
+        decrement && path.includes(decrement) ? -1 : increment && path.includes(increment) ? 1 : 0;
+      if (delta === 0) return;
+      const next = state.count() + delta;
+      emit(host, onChange(), "change", "value", next);
+      if (!state.controlled) state.count(next);
+    };
+    const sync = () => {
+      decrement = undefined;
+      output = undefined;
+      increment = undefined;
+
+      const nextDecrement = requireSlottedElement(host, "decrement", HTMLButtonElement);
+      const nextOutput = requireSlottedElement(host, "value", HTMLOutputElement);
+      const nextIncrement = requireSlottedElement(host, "increment", HTMLButtonElement);
+
+      decrement = nextDecrement;
+      output = nextOutput;
+      increment = nextIncrement;
+
+      nextDecrement.setAttribute("aria-label", "Decrement count");
+      decorateButton(
+        nextDecrement,
+        "counter-minus-button",
+        DECREMENT_TEST_ID,
+        nextDecrement.className,
+      );
+      nextOutput.setAttribute("aria-live", "polite");
+      nextOutput.dataset.testid ||= OUTPUT_TEST_ID;
+      nextOutput.className = partClassName("counter-label", nextOutput.className);
+      nextIncrement.setAttribute("aria-label", "Increment count");
+      decorateButton(
+        nextIncrement,
+        "counter-plus-button",
+        INCREMENT_TEST_ID,
+        nextIncrement.className,
+      );
+
+      const text = String(state.count());
+      if (nextOutput.textContent !== text) nextOutput.textContent = text;
+    };
+
+    const disposeObserver = observeSlotSubtree(host, sync, ["class", "disabled", "slot"]);
+    effect(() => {
+      const text = String(state.count());
+      if (output && output.textContent !== text) output.textContent = text;
     });
-
-    const dispose = useEffects(() => {
-      const raw = props.value();
-      if (raw !== null) {
+    effect(() => {
+      const next = value();
+      const hasValue = host.hasAttribute("value");
+      if (hasValue) {
         state.controlled = true;
-        count(parseCounterValue(raw));
-      } else if (!state.initialized) {
-        count(parseCounterValue(props.defaultValue()));
-      } else if (state.controlled) {
-        count(0);
+        state.count(next);
+      } else if (state.initialized && state.controlled) {
+        state.controlled = false;
+        state.count(0);
+      } else if (!state.initialized && !state.controlled) {
+        state.count(defaultValue());
       }
       state.initialized = true;
     });
-    return { disconnect: dispose };
-  },
-  () => {
-    const defineButton = (tag: "minus-button" | "plus-button", delta: number) => {
-      const buttonProperties = {} as const;
-      defineComponent<CounterContext, HTMLButtonElement, typeof buttonProperties>(
-        tag,
-        HTMLButtonElement,
-        buttonProperties,
-        (element, _props, context) => {
-          const marker = delta < 0 ? "counter-minus-button" : "counter-plus-button";
-          element.setAttribute("aria-label", delta < 0 ? "Decrement count" : "Increment count");
-          const buttonText = delta < 0 ? "−" : "+";
-          element.textContent = buttonText;
-          queueMicrotask(() => {
-            element.textContent = buttonText;
-          });
-          decorateButton(
-            element,
-            marker,
-            delta < 0 ? BWC_COUNTER_MINUS_TAG : BWC_COUNTER_PLUS_TAG,
-            element.className,
-          );
-          const click = () => {
-            const state = context();
-            const next = state.count() + delta;
-            emit(
-              element.closest(BWC_COUNTER_TAG) as HTMLElement,
-              state.onChange,
-              "change",
-              "value",
-              next,
-            );
-            if (!state.controlled) state.count(next);
-          };
-          element.addEventListener("click", click);
-          return {
-            attributeChanged(name) {
-              if (name === "class")
-                decorateButton(
-                  element,
-                  marker,
-                  delta < 0 ? BWC_COUNTER_MINUS_TAG : BWC_COUNTER_PLUS_TAG,
-                  element.className,
-                );
-            },
-            disconnect: () => element.removeEventListener("click", click),
-          };
-        },
-      );
-    };
 
-    defineButton("minus-button", -1);
-    const labelProperties = {} as const;
-    defineComponent<CounterContext, HTMLSpanElement, typeof labelProperties>(
-      "label",
-      HTMLSpanElement,
-      labelProperties,
-      (element, _props, context) => {
-        element.setAttribute("aria-live", "polite");
-        element.dataset.testid ||= BWC_COUNTER_LABEL_TAG;
-        element.className = element.className
-          ? `counter-label ${element.className}`
-          : "counter-label";
-        const dispose = useEffects(() => {
-          element.textContent = String(context().count());
-        });
-        return { disconnect: dispose };
-      },
-    );
-    defineButton("plus-button", 1);
-  },
-);
+    host.addEventListener("click", click);
+    return () => {
+      host.removeEventListener("click", click);
+      disposeObserver();
+    };
+  });
+
+  return html`<slot name="decrement"></slot><slot name="value"></slot
+    ><slot name="increment"></slot>`;
+});

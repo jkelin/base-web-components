@@ -5,6 +5,6 @@
 }
 
 /* Only the dialog backdrop needs raw CSS; dialog presentation rides popup-class. */
-dialog:is([is="bwc-modal-popup"])::backdrop {
+dialog[slot="popup"]::backdrop {
   background: rgb(28 25 23 / 0.55);
 }

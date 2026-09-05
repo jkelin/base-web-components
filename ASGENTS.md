@@ -1,6 +1,7 @@
 # ASGENTS.md — basic-web-components
 
-Single vanilla library (`basic-web-components`, prefix `bwc`). No shadow DOM.
+Single library (`basic-web-components`, prefix `bwc`): one custom root per
+family, microfw-backed — shadow roots project light-DOM native slots.
 No CDN in the repo: smoke CSS is local.
 
 ## Toolchain
@@ -21,35 +22,35 @@ No CDN in the repo: smoke CSS is local.
 
 ## Component rules
 
-- Declare every public property once: attribute-backed (`"value": "value"`)
-  or callback-only (`onChange: null`). Only attribute-backed declarations
-  get signals, observed attributes, and attribute sync; callback-only
-  properties install plain descriptors, accept function-or-null (validated,
-  e.g. via `callbackValue`), and are captured/restored through setters on
-  reconnect while attribute-backed state rebuilds from attributes. Missing
-  or duplicate installation throws.
-- Children resolve and share the parent context on connect, throwing when
-  the required parent is absent; parent contexts register children on
-  connect and unregister them on disconnect.
-- Every effect/listener/observer created on connect is disposed on disconnect,
-  and re-created on reconnect. `onclick`-style author handlers are never clobbered.
+- Props are typed `useProp(name, options)` declarations from `microfw`
+  (overloaded; attribute-backed or callback-only per the family contract).
+  Render setup uses `useHost`, `onMount` (returning cleanup), and `effect`;
+  shared codecs and slot helpers import directly from `src/shared`. Mount
+  effects, listeners, and observers are disposed on unmount and re-created
+  on remount. `onclick`-style author handlers are never clobbered.
 - Part-class props (`button-class`, `thumb-class`, `input-class`;
   `trigger-class`, `popup-class`, `close-class`; `field-class`,
   `hidden-input-class`) carry plain space-separated Tailwind strings merged
   after the stable marker class by part controllers. `bwc-switch` generates
-  its button/thumb/input (never author them); `bwc-otp` generates exactly
-  `length` native `input` fields plus one hidden form input (no `bwc-otp-field`
-  tag; generated fields carry `data-testid="bwc-otp-input"`). Validate at the
-  boundary and throw clear errors:
-  invalid enum values, duplicate or empty item values. Never coerce silently,
-  never fall back silently.
+  its `button slot="control"` (with thumb `span` and hidden `input`; never
+  author them); `bwc-otp` generates exactly `length` native `input`
+  `slot="field"` fields plus one hidden form input `slot="form-control"`
+  (no custom field tag; generated fields carry
+  `data-testid="bwc-otp-input"`). Validate at the boundary and throw clear
+  errors: invalid enum values, duplicate or empty item values. Never coerce
+  silently, never fall back silently.
 
-## Native hosts
+## Native slots
 
-- Interactive leaves are customized built-ins on native hosts (`button`, `span`,
-  `dialog`, `div`): construct with `document.createElement(tag, { is: name })`
-  or parse `<tag is="name">`. Customized built-ins cannot extend from an
-  autonomous tag, so consumers must use the native tag with `is=`.
+- Children are plain native elements assigned by `slot`, never custom child
+  tags and never `is=`: counter takes `button slot="decrement"`,
+  `output slot="value"`, `button slot="increment"`; accordion takes
+  `details slot="item" data-value="<id>"` holding a `<summary>` title plus a
+  panel `<div>`; modal/popover take `slot="trigger"` buttons, a `slot="popup"`
+  `dialog`/`div`, and an inner `<button data-close>`; tabs takes a
+  `div slot="list"` of `<button value="<id>">` plus
+  `section slot="panel" data-value="<id>"`. `bwc-switch` and `bwc-otp` take
+  no author children — their parts are generated (see above).
 - Every interactive element keeps a stable `id` and `data-testid`, and exposes
   the correct cursor (`pointer` for click targets, `text` for inputs,
   `not-allowed` when disabled). Author classes/ids survive upgrades.
@@ -58,14 +59,17 @@ No CDN in the repo: smoke CSS is local.
 
 - Seven entries, no aggregate root runtime: `counter`, `accordion`, `modal`,
   `popover`, `switch`, `otp`, `tabs` → `dist/<name>.js`
-  (Oxc-minified ES modules, ES2022). `sideEffects` preserves self-registration.
+  (native-minified ES modules, ES2022) plus one `shared.js` chunk carrying
+  shared helpers and the single microfw/alien runtime copy.
+  `sideEffects` preserves self-registration.
 
 ## Smoke imports
 
 - `smoke/` imports only by package subpath (`basic-web-components/counter`, …).
   Never relative imports into the library, never dist paths.
 - `smoke/vite.config.ts` keeps `resolve.conditions` starting with
-  `["source", "development", …]` and `optimizeDeps.exclude` for the library.
+  `["source", "development", …]` and `optimizeDeps.exclude` for the library
+  and `microfw` (one source copy, never prebundled apart).
 - Smoke visibly exercises the counter plus all six suites, shows PASS/FAIL in
   `#smoke-result`, and rethrows the real error on failure.
 - Tailwind utilities live in markup `class` and part-class attributes

@@ -41,22 +41,25 @@ function required<T extends Element = Element>(selector: string): T {
 }
 
 async function exerciseCounter() {
-  await Promise.all(
-    ["bwc-counter", "bwc-counter-minus-button", "bwc-counter-label", "bwc-counter-plus-button"].map(
-      (tag) => customElements.whenDefined(tag),
-    ),
-  );
+  await customElements.whenDefined("bwc-counter");
   document.querySelector("#rail-counter")?.setAttribute("data-state", "ready");
 
   const minus = required<HTMLButtonElement>("#smoke-minus-button");
   const label = required("#smoke-label");
   const plus = required<HTMLButtonElement>("#smoke-plus-button");
 
-  // Customized built-ins upgrade on their native hosts: no nested controls.
+  // Native slot children project without nested controls.
   if (minus.localName !== "button" || plus.localName !== "button") {
     throw new Error("counter buttons are not native button hosts");
   }
-  if (label.localName !== "span") throw new Error("counter label is not a native span host");
+  if (label.localName !== "output") throw new Error("counter value is not a native output");
+  if (
+    minus.getAttribute("slot") !== "decrement" ||
+    label.getAttribute("slot") !== "value" ||
+    plus.getAttribute("slot") !== "increment"
+  ) {
+    throw new Error("counter children lack slot assignments");
+  }
   if (minus.children.length || label.children.length || plus.children.length) {
     throw new Error("counter controls rendered nested elements");
   }
@@ -94,20 +97,13 @@ async function exerciseControlled() {
 async function exerciseSuites() {
   await Promise.all(
     [
+      "bwc-counter",
       "bwc-accordion",
-      "bwc-accordion-trigger",
       "bwc-modal",
-      "bwc-modal-trigger",
-      "bwc-modal-popup",
-      "bwc-modal-close",
       "bwc-popover",
-      "bwc-popover-trigger",
-      "bwc-popover-popup",
-      "bwc-popover-close",
       "bwc-switch",
       "bwc-otp",
       "bwc-tabs",
-      "bwc-tab",
     ].map((tag) => customElements.whenDefined(tag)),
   );
   for (const entry of ["accordion", "modal", "popover", "switch", "otp", "tabs"]) {
@@ -117,13 +113,23 @@ async function exerciseSuites() {
   requestAnimationFrame(() => resolve());
   await promise;
 
-  // Accordion toggles open, then closes again.
-  const accordionTrigger = required<HTMLButtonElement>("#smoke-accordion-trigger");
+  // Accordion toggles its native details open, then closes again.
+  const accordionItem = required<HTMLDetailsElement>("#smoke-accordion-item");
+  const accordionTrigger = required<HTMLElement>("#smoke-accordion-trigger");
   const accordionPanel = required<HTMLElement>("#smoke-accordion-panel");
+  if (accordionItem.getAttribute("slot") !== "item") {
+    throw new Error("accordion item lacks slot assignment");
+  }
+  if (accordionTrigger.localName !== "summary") {
+    throw new Error("accordion trigger is not a native summary");
+  }
+  if (!accordionItem.contains(accordionPanel)) {
+    throw new Error("accordion panel is not inside its item");
+  }
   accordionTrigger.click();
-  if (accordionPanel.hidden) throw new Error("accordion did not open");
+  await waitFor(() => accordionItem.open, true, "accordion open");
   accordionTrigger.click();
-  await waitFor(() => accordionPanel.hidden, true, "accordion close");
+  await waitFor(() => accordionItem.open, false, "accordion close");
 
   // Switch toggles its generated button, thumb, and native form input.
   const switchLabel = required<HTMLLabelElement>("#smoke-switch-label");
@@ -147,6 +153,9 @@ async function exerciseSuites() {
   }
   if (switchButton.id !== "smoke-switch-button") {
     throw new Error("switch button id is not derived from root id");
+  }
+  if (switchButton.getAttribute("slot") !== "control") {
+    throw new Error("switch button lacks control slot assignment");
   }
   if (switchLabel.getAttribute("for") !== switchButton.id) {
     throw new Error("switch label does not target the generated button");
@@ -179,6 +188,15 @@ async function exerciseSuites() {
   const panelTwo = required<HTMLElement>("#smoke-tab-panel-two");
   tabTwo.click();
   if (!panelOne.hidden || panelTwo.hidden) throw new Error("tabs did not select");
+  if (
+    panelOne.localName !== "section" ||
+    panelOne.getAttribute("slot") !== "panel" ||
+    panelOne.getAttribute("data-value") !== "one" ||
+    panelTwo.getAttribute("slot") !== "panel" ||
+    panelTwo.getAttribute("data-value") !== "two"
+  ) {
+    throw new Error("tabs panels lack native section slots");
+  }
 
   // Modal opens its native dialog host and closes it.
   const modalRoot = required("#smoke-modal");
@@ -194,6 +212,13 @@ async function exerciseSuites() {
   const modalClose = required<HTMLButtonElement>("#smoke-modal-close");
   if (!(modalPopup instanceof HTMLDialogElement)) {
     throw new Error("modal popup is not a native dialog host");
+  }
+  if (
+    modalTrigger.getAttribute("slot") !== "trigger" ||
+    modalPopup.getAttribute("slot") !== "popup" ||
+    modalClose.getAttribute("data-close") === null
+  ) {
+    throw new Error("modal children lack slot assignments");
   }
   modalTrigger.click();
   await waitFor(() => modalPopup.open, true, "modal open");
@@ -212,6 +237,13 @@ async function exerciseSuites() {
   const popoverClose = required<HTMLButtonElement>("#smoke-popover-close");
   if (popoverPopup.localName !== "div") {
     throw new Error("popover popup is not a native div host");
+  }
+  if (
+    popoverTrigger.getAttribute("slot") !== "trigger" ||
+    popoverPopup.getAttribute("slot") !== "popup" ||
+    popoverClose.getAttribute("data-close") === null
+  ) {
+    throw new Error("popover children lack slot assignments");
   }
   popoverTrigger.click();
   await waitFor(() => popoverTrigger.getAttribute("aria-expanded"), "true", "popover open");
@@ -248,7 +280,7 @@ async function exerciseSuites() {
     throw new Error("otp part-class inputs are missing");
   }
   if (otp.querySelector("[is]") !== null) {
-    throw new Error("otp fields must be generated, not customized built-ins");
+    throw new Error("otp fields must be generated native inputs");
   }
   await waitFor(
     () => otp.querySelectorAll('input[data-testid="bwc-otp-input"]').length,
@@ -269,6 +301,12 @@ async function exerciseSuites() {
   }
   const otpHidden = otp.querySelector<HTMLInputElement>('[data-testid="bwc-otp-hidden-input"]');
   if (otpHidden?.value !== "1234") throw new Error("otp hidden input did not sync");
+  if (
+    otpInput.getAttribute("slot") !== "field" ||
+    otpHidden?.getAttribute("slot") !== "form-control"
+  ) {
+    throw new Error("otp generated inputs lack slot assignments");
+  }
 
   // Tabs move keyboard focus without breaking selection.
   tabTwo.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));

@@ -246,3 +246,90 @@ describe("useProp", () => {
     handle.dispose();
   });
 });
+
+describe("typed useProp", () => {
+  const numberOptions = {
+    attribute: "count",
+    defaultValue: 0,
+    fromAttribute: (raw: string | null) => (raw === null ? 0 : Number(raw)),
+    fromProperty: (raw: unknown) => {
+      if (typeof raw !== "number" || !Number.isFinite(raw))
+        throw new TypeError("count must be finite");
+      return raw;
+    },
+    toAttribute: String,
+  } as const;
+
+  it("hydrates aliases and callback-only properties assigned before render", () => {
+    const host = document.createElement("div") as HTMLDivElement & {
+      defaultValue: number;
+      onChange: ((value: number) => void) | null;
+    };
+    const callback = () => {};
+    Object.defineProperty(host, "defaultValue", { configurable: true, value: 4 });
+    Object.defineProperty(host, "onChange", { configurable: true, value: callback });
+
+    const handle = renderWithProps(host, () => ({
+      defaultValue: useProp("defaultValue", { ...numberOptions, attribute: "default-value" }),
+      onChange: useProp("onChange", {
+        attribute: null,
+        defaultValue: null as ((value: number) => void) | null,
+        fromProperty(raw: unknown) {
+          if (raw !== null && typeof raw !== "function") throw new TypeError("invalid callback");
+          return raw as ((value: number) => void) | null;
+        },
+      }),
+    }));
+
+    expect(handle.result.defaultValue()).toBe(4);
+    expect(host.getAttribute("default-value")).toBeNull();
+    expect(handle.result.onChange()).toBe(callback);
+    handle.reconnect();
+    expect(host.getAttribute("default-value")).toBe("4");
+    expect(host.onChange).toBe(callback);
+    handle.dispose();
+  });
+
+  it("validates writes before mutation and handles reflected attribute removal", async () => {
+    const host = document.createElement("div") as HTMLDivElement & { count: number };
+    host.setAttribute("count", "2");
+    const handle = renderWithProps(host, () => useProp("count", numberOptions));
+    handle.reconnect();
+
+    expect(host.count).toBe(2);
+    expect(() => {
+      host.count = Number.NaN;
+    }).toThrow("count must be finite");
+    expect(handle.result()).toBe(2);
+    expect(host.getAttribute("count")).toBe("2");
+
+    host.removeAttribute("count");
+    await microtask();
+    expect(host.count).toBe(0);
+    handle.dispose();
+  });
+
+  it("supports custom public getters and setters without duplicate descriptors", () => {
+    const host = document.createElement("div") as HTMLDivElement & { value: number };
+    let local = 3;
+    let controlled = false;
+    const handle = renderWithProps(host, () =>
+      useProp("value", {
+        ...numberOptions,
+        attribute: "value",
+        get: () => local,
+        onSet(value, commit) {
+          controlled = true;
+          local = value;
+          commit(value);
+        },
+      }),
+    );
+
+    host.value = 7;
+    expect(controlled).toBe(true);
+    expect(host.value).toBe(7);
+    expect(Object.hasOwn(host, "value")).toBe(true);
+    handle.dispose();
+  });
+});

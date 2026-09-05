@@ -9,7 +9,7 @@ export default defineConfig({
     conditions: ["source", "development", "import", "module", "browser", "default"],
   },
   optimizeDeps: {
-    exclude: ["basic-web-components"],
+    exclude: ["basic-web-components", "microfw"],
   },
   server: {
     host: "127.0.0.1",

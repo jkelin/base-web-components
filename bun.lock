@@ -11,11 +11,11 @@
         "oxlint": "^1.80.0",
       },
     },
-    "microfw": {
-      "name": "microfw",
+    "packages/basic-web-components": {
+      "name": "basic-web-components",
       "version": "1.0.0",
       "dependencies": {
-        "alien-signals": "^3.2.1",
+        "microfw": "workspace:*",
       },
       "devDependencies": {
         "happy-dom": "^20.12.0",
@@ -24,8 +24,8 @@
         "vitest": "^4.1.10",
       },
     },
-    "packages/basic-web-components": {
-      "name": "basic-web-components",
+    "packages/microfw": {
+      "name": "microfw",
       "version": "1.0.0",
       "dependencies": {
         "alien-signals": "^3.2.1",
@@ -294,7 +294,7 @@
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
-    "microfw": ["microfw@workspace:microfw"],
+    "microfw": ["microfw@workspace:packages/microfw"],
 
     "nanoid": ["nanoid@3.3.18", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w=="],
 

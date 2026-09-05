@@ -38,6 +38,13 @@ function parts(root: HTMLElement) {
   return { button, thumb, input };
 }
 
+function slots(root: HTMLElement) {
+  const control = root.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="control"]');
+  const formControl = root.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="form-control"]');
+  if (!control || !formControl) throw new Error("switch slots did not render");
+  return { control, formControl };
+}
+
 afterEach(() => document.body.replaceChildren());
 
 describe("switch behavior", () => {
@@ -61,6 +68,9 @@ describe("switch behavior", () => {
     expect(button.getAttribute("aria-checked")).toBe("false");
     expect(root.hasAttribute("data-unchecked")).toBe(true);
     expect(callback).toHaveBeenCalledWith(false);
+    expect(button.slot).toBe("control");
+    expect(parts(root).input.slot).toBe("form-control");
+    expect(slots(root).control.assignedElements()).toEqual([button]);
   });
 
   it("keeps controlled state while emitting requested changes", () => {
@@ -73,6 +83,12 @@ describe("switch behavior", () => {
     expect(parts(root).button.getAttribute("aria-checked")).toBe("true");
     expect(callback).toHaveBeenCalledOnce();
     expect(callback).toHaveBeenCalledWith(false);
+    const event = vi.fn();
+    root.addEventListener("checked-change", (nextEvent) =>
+      event((nextEvent as CustomEvent<{ checked: boolean }>).detail),
+    );
+    parts(root).button.click();
+    expect(event).toHaveBeenCalledWith({ checked: false });
   });
 
   it("ignores readonly and disabled activation with correct states and cursors", () => {
@@ -182,6 +198,36 @@ describe("switch behavior", () => {
     expect([...new FormData(form).entries()]).toEqual([]);
   });
 
+  it("restores an uncontrolled default on form reset", () => {
+    document.body.innerHTML =
+      '<form><bwc-switch name="alerts" default-checked></bwc-switch></form>';
+    const form = document.querySelector<HTMLFormElement>("form");
+    const root = document.querySelector<SwitchApi>("bwc-switch");
+    if (!form || !root) throw new Error("resettable switch did not mount");
+
+    parts(root).button.click();
+    expect(root.checked).toBe(false);
+    form.reset();
+    expect(root.checked).toBe(true);
+    expect(parts(root).input.checked).toBe(true);
+  });
+
+  it("keeps controlled state coherent when an external owner form resets", () => {
+    document.body.innerHTML =
+      '<form id="owner"></form><bwc-switch form="owner" name="alerts"></bwc-switch>';
+    const form = document.querySelector<HTMLFormElement>("form");
+    const root = document.querySelector<SwitchApi>("bwc-switch");
+    if (!form || !root) throw new Error("externally owned switch did not mount");
+
+    root.checked = true;
+    expect(root.checked).toBe(true);
+    expect(parts(root).input.defaultChecked).toBe(true);
+    form.reset();
+    expect(root.checked).toBe(true);
+    expect(parts(root).input.checked).toBe(true);
+    expect([...new FormData(form).entries()]).toEqual([["alerts", "on"]]);
+  });
+
   it("reactively applies part classes without changing root class or id", () => {
     const root = mount(
       'id="consumer-switch" class="consumer" button-class="button-a" thumb-class="thumb-a" input-class="input-a"',
@@ -211,5 +257,15 @@ describe("switch behavior", () => {
     root.remove();
     document.body.append(root);
     expect(parts(root).button.id).toBe("authored-label-target");
+  });
+
+  it("keeps authored light-DOM content outside generated slots", () => {
+    document.body.innerHTML = "<bwc-switch><span data-author>Help</span></bwc-switch>";
+    const root = document.querySelector<SwitchApi>("bwc-switch");
+    if (!root) throw new Error("authored switch did not mount");
+
+    expect(root.querySelector("[data-author]")?.textContent).toBe("Help");
+    expect(parts(root).button.slot).toBe("control");
+    expect(parts(root).input.slot).toBe("form-control");
   });
 });

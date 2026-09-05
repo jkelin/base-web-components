@@ -11,15 +11,27 @@ const entries = {
 };
 
 export default defineConfig({
+  // `source` + `development` first so the shared microfw/alien runtime resolves
+  // to TypeScript source and bundles exactly once into shared.js.
+  resolve: {
+    conditions: ["source", "development", "import", "module", "browser", "default"],
+  },
   build: {
     target: "es2022",
-    minify: "oxc",
+    // Native Rolldown full minify, matching microfw: Vite's oxc pass is redundant
+    // alongside rolldown output minify.
+    minify: false,
     rolldownOptions: {
       output: {
         entryFileNames: "[name].js",
         chunkFileNames: "shared.js",
         manualChunks(id: string) {
-          if (id.includes("/src/shared/") || id.includes("node_modules")) return "shared";
+          if (
+            id.includes("/src/shared/") ||
+            id.includes("packages/microfw/") ||
+            id.includes("node_modules")
+          )
+            return "shared";
         },
         minify: true,
       },

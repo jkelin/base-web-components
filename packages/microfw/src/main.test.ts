@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { defineComponent, html, signal, useProp } from "./main";
+import { defineComponent, effect, html, onMount, signal, useHost, useProp } from "./main";
 
 let elementCounter = 0;
 function elementName(prefix: string): string {
@@ -470,5 +470,131 @@ describe("defineComponent", () => {
     } finally {
       unbind();
     }
+  });
+});
+
+describe("component hooks", () => {
+  it("provides the host during render and mounts after shadow creation and prop reconciliation", () => {
+    const name = elementName("x-hooks");
+    const calls: string[] = [];
+    defineComponent(name, () => {
+      const host = useHost();
+      const value = useProp("value");
+      calls.push(`render:${host.localName}`);
+      onMount(() => {
+        calls.push(`mount:${host.shadowRoot !== null}:${value()}`);
+        return () => calls.push("cleanup");
+      });
+      return html`<slot name="content"></slot>`;
+    });
+
+    const host = document.createElement(name);
+    host.setAttribute("value", "ready");
+    document.body.append(host);
+    expect(calls).toEqual([`render:${name}`, "mount:true:ready"]);
+
+    host.remove();
+    expect(calls).toEqual([`render:${name}`, "mount:true:ready", "cleanup"]);
+    document.body.append(host);
+    expect(calls).toEqual([`render:${name}`, "mount:true:ready", "cleanup", "mount:true:ready"]);
+    host.remove();
+  });
+
+  it("rolls back earlier mounts when a later mount fails", () => {
+    const name = elementName("x-mount-failure");
+    const cleanup = vi.fn();
+    defineComponent(name, () => {
+      onMount(() => cleanup);
+      onMount(() => {
+        throw new Error("mount failed");
+      });
+      return html`<span>body</span>`;
+    });
+
+    const host = document.createElement(name);
+    expect(() => document.body.append(host)).toThrow("mount failed");
+    expect(cleanup).toHaveBeenCalledOnce();
+    host.remove();
+  });
+
+  it("disposes effects created by a mount that throws", () => {
+    const name = elementName("x-effect-failure");
+    const source = signal(0);
+    const reads = vi.fn();
+    defineComponent(name, () => {
+      onMount(() => {
+        effect(() => reads(source()));
+        throw new Error("setup failed");
+      });
+      return html`<span>body</span>`;
+    });
+
+    const host = document.createElement(name);
+    expect(() => document.body.append(host)).toThrow("setup failed");
+    expect(reads).toHaveBeenCalledOnce();
+    source(1);
+    expect(reads).toHaveBeenCalledOnce();
+    host.remove();
+  });
+
+  it("disposes a mount scope even when setup throws undefined", () => {
+    const name = elementName("x-undefined-failure");
+    const source = signal(0);
+    const reads = vi.fn();
+    defineComponent(name, () => {
+      onMount(() => {
+        effect(() => reads(source()));
+        throw undefined;
+      });
+      return html`<span>body</span>`;
+    });
+
+    const host = document.createElement(name);
+    let threw = false;
+    try {
+      document.body.append(host);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+    source(1);
+    expect(reads).toHaveBeenCalledOnce();
+    host.remove();
+  });
+
+  it("disposes remaining mounts and props after a cleanup throws", () => {
+    const name = elementName("x-cleanup-failure");
+    const source = signal(0);
+    const reads = vi.fn();
+    const finalCleanup = vi.fn();
+    defineComponent(name, () => {
+      const label = useProp("label");
+      onMount(() => finalCleanup);
+      onMount(() => {
+        effect(() => reads(source()));
+        return () => {
+          throw new Error("cleanup failed");
+        };
+      });
+      return html`<span>${label}</span>`;
+    });
+
+    const host = document.createElement(name) as HTMLElement & { label: string | null };
+    document.body.append(host);
+    host.label = "connected";
+    expect(() => host.remove()).toThrow("cleanup failed");
+    expect(finalCleanup).toHaveBeenCalledOnce();
+
+    source(1);
+    host.label = "detached";
+    expect(reads).toHaveBeenCalledOnce();
+    expect(host.getAttribute("label")).toBe("connected");
+  });
+
+  it("returns the registered autonomous element constructor", () => {
+    const name = elementName("x-constructor");
+    const Constructor = defineComponent(name, () => html`<slot></slot>`);
+    const host = new Constructor();
+    expect(host.localName).toBe(name);
   });
 });

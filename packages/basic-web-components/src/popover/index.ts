@@ -1,250 +1,258 @@
+import { defineComponent, effect, html, onMount, useHost, useProp } from "microfw";
 import {
-  booleanValue,
-  callbackValue,
+  booleanProp,
+  belongsToHost,
+  callbackProp,
+  createPartClassController,
   decorateButton,
-  defineComponent,
   emit,
-  enumValue,
-  finiteNumber,
+  enumProp,
   nextId,
-  observeChildren,
-  useEffects,
+  numberProp,
+  observeSlotSubtree,
+  requireSlottedElement,
+  stringProp,
   type ChangeCallback,
 } from "../shared";
 
 export const BWC_POPOVER_TAG = "bwc-popover";
-export const BWC_POPOVER_TRIGGER_TAG = `${BWC_POPOVER_TAG}-trigger`;
-export const BWC_POPOVER_POPUP_TAG = `${BWC_POPOVER_TAG}-popup`;
-export const BWC_POPOVER_CLOSE_TAG = `${BWC_POPOVER_TAG}-close`;
 
-type PopoverState = {
-  controlled: boolean;
-  initialized: boolean;
-  onOpenChange: ChangeCallback<boolean>;
-  open: boolean;
-};
 const sides = ["top", "right", "bottom", "left"] as const;
-const popoverProperties = {
-  open: "open",
-  defaultOpen: "default-open",
-  disabled: "disabled",
-  side: "side",
-  sideOffset: "side-offset",
-  onOpenChange: null,
-} as const;
+type Side = (typeof sides)[number];
 
-export const BwcPopoverElement = defineComponent<
-  PopoverState,
-  HTMLElement,
-  typeof popoverProperties
->(
-  BWC_POPOVER_TAG,
-  HTMLElement,
-  popoverProperties,
-  (element, props, context, properties) => {
-    const previous = context();
-    // Defaults initialize once; reconnects retain the last uncontrolled open state.
-    const state: PopoverState =
-      "open" in previous
-        ? previous
-        : {
-            controlled: props.open() !== null,
-            initialized: false,
-            onOpenChange: null,
-            open: props.open() !== null,
-          };
-    context(state);
-    const side = () => enumValue(props.side(), sides, "bottom", "side");
-    const sideOffset = () =>
-      props.sideOffset() === null ? 0 : finiteNumber(props.sideOffset(), "sideOffset");
+export type BwcPopoverElement = HTMLElement & {
+  open: boolean;
+  defaultOpen: boolean;
+  disabled: boolean;
+  side: Side;
+  sideOffset: number;
+  triggerClass: string;
+  popupClass: string;
+  closeClass: string;
+  onOpenChange: ChangeCallback<boolean>;
+};
 
-    const position = () => {
-      const trigger = element.querySelector<HTMLButtonElement>(
-        `button[is="${BWC_POPOVER_TRIGGER_TAG}"]`,
-      );
-      const popup = element.querySelector<HTMLDivElement>(`div[is="${BWC_POPOVER_POPUP_TAG}"]`);
-      if (!trigger || !popup) return;
-      // Static viewport origin for transform-only positioning, never dynamic positioning.
-      // Native [popover] UA styles use inset/margins, so own the baseline without reset CSS.
-      popup.style.inset = "0 auto auto 0";
-      popup.style.margin = "0";
-      popup.style.position = "fixed";
-      if (!state.open) return;
+export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_TAG, () => {
+  const host = useHost<BwcPopoverElement>();
+  let controlled = host.hasAttribute("open") || Object.hasOwn(host, "open");
+  let openState = false;
+  let initialized = false;
+  let activePopup: HTMLDivElement | null = null;
+  const shownPopups = new WeakSet<HTMLDivElement>();
+  const classControllers = new WeakMap<HTMLElement, (partClass?: string | null) => void>();
 
-      const rect = trigger.getBoundingClientRect();
-      const offset = sideOffset();
-      const currentSide = side();
-      popup.style.setProperty("--anchor-left", `${rect.left}px`);
-      popup.style.setProperty("--anchor-top", `${rect.top}px`);
-      popup.style.setProperty("--anchor-width", `${rect.width}px`);
-      popup.style.setProperty("--anchor-height", `${rect.height}px`);
-      if (currentSide === "bottom") {
-        popup.style.transform = `translate3d(${rect.left}px, ${rect.bottom + offset}px, 0)`;
-      } else if (currentSide === "top") {
-        popup.style.transform = `translate3d(${rect.left}px, ${rect.top - offset}px, 0) translateY(-100%)`;
-      } else if (currentSide === "right") {
-        popup.style.transform = `translate3d(${rect.right + offset}px, ${rect.top}px, 0)`;
-      } else {
-        popup.style.transform = `translate3d(${rect.left - offset}px, ${rect.top}px, 0) translateX(-100%)`;
-      }
-    };
-    const sync = () => {
-      if (!state.initialized) {
-        state.initialized = true;
-        if (!state.controlled) state.open = props.defaultOpen() !== null;
-      }
-      const trigger = element.querySelector<HTMLButtonElement>(
-        `button[is="${BWC_POPOVER_TRIGGER_TAG}"]`,
-      );
-      const popup = element.querySelector<HTMLDivElement>(`div[is="${BWC_POPOVER_POPUP_TAG}"]`);
-      if (!trigger || !popup) return;
-      popup.id ||= nextId(BWC_POPOVER_POPUP_TAG);
-      popup.setAttribute("popover", "auto");
-      popup.setAttribute("role", "dialog");
-      trigger.setAttribute("aria-haspopup", "dialog");
-      trigger.setAttribute("aria-expanded", String(state.open));
-      trigger.setAttribute("aria-controls", popup.id);
-      trigger.disabled = props.disabled() !== null;
-      decorateButton(
-        trigger,
-        "popover-trigger",
-        BWC_POPOVER_TRIGGER_TAG,
-        trigger.className.replace(/(?:^| )popover-trigger(?: |$)/g, " ").trim(),
-      );
-      for (const node of [trigger, popup]) {
-        node.toggleAttribute("data-open", state.open);
-        node.toggleAttribute("data-closed", !state.open);
-        node.toggleAttribute("data-disabled", props.disabled() !== null);
-      }
-      popup.dataset.side = side();
-      const shown = popup.matches(":popover-open");
-      if (state.open && !shown) {
-        if (typeof popup.showPopover === "function") popup.showPopover();
-        else popup.hidden = false;
-      }
-      if (!state.open && shown) popup.hidePopover();
-      if (!state.open && typeof popup.showPopover !== "function") popup.hidden = true;
-      position();
-    };
+  const open = useProp<boolean>("open", {
+    ...booleanProp("open"),
+    get: () => openState,
+    onSet: (value, commit) => {
+      controlled = true;
+      commit(value);
+    },
+  });
+  const defaultOpen = useProp<boolean>("defaultOpen", booleanProp("default-open"));
+  const disabled = useProp<boolean>("disabled", booleanProp("disabled"));
+  const side = useProp<Side>("side", enumProp("side", sides, "bottom"));
+  const sideOffset = useProp<number>("sideOffset", numberProp("side-offset"));
+  const triggerClass = useProp<string>("triggerClass", stringProp("trigger-class"));
+  const popupClass = useProp<string>("popupClass", stringProp("popup-class"));
+  const closeClass = useProp<string>("closeClass", stringProp("close-class"));
+  const onOpenChange = useProp<ChangeCallback<boolean>>(
+    "onOpenChange",
+    callbackProp<boolean>("onOpenChange"),
+  );
+  openState = controlled ? open() : defaultOpen();
 
-    properties.install({
-      open: {
-        get: () => state.open,
-        set: (next) => {
-          state.controlled = true;
-          element.toggleAttribute("open", booleanValue(next, "open"));
-        },
-      },
-      defaultOpen: {
-        get: () => props.defaultOpen() !== null,
-        set: (next) => element.toggleAttribute("default-open", booleanValue(next, "defaultOpen")),
-      },
-      disabled: {
-        get: () => props.disabled() !== null,
-        set: (next) => element.toggleAttribute("disabled", booleanValue(next, "disabled")),
-      },
-      side: {
-        get: side,
-        set: (next) =>
-          element.setAttribute("side", enumValue(String(next), sides, "bottom", "side")),
-      },
-      sideOffset: {
-        get: sideOffset,
-        set: (next) =>
-          element.setAttribute("side-offset", String(finiteNumber(next, "sideOffset"))),
-      },
-      onOpenChange: {
-        get: () => state.onOpenChange,
-        set: (next) => {
-          state.onOpenChange = callbackValue<boolean>(next, "onOpenChange");
-        },
-      },
-    });
+  const applyPartClass = (part: HTMLElement, marker: string, value: string) => {
+    let apply = classControllers.get(part);
+    if (!apply) {
+      apply = createPartClassController(part, marker, value);
+      classControllers.set(part, apply);
+    }
+    apply(value);
+  };
 
-    const requestOpen = (next: boolean) => {
-      if (props.disabled() !== null || next === state.open) return;
-      emit(element, state.onOpenChange, "open-change", "open", next);
-      if (!state.controlled) {
-        state.open = next;
-        sync();
+  const parts = () => ({
+    popup: requireSlottedElement(host, "popup", HTMLDivElement),
+    trigger: requireSlottedElement(host, "trigger", HTMLButtonElement),
+  });
+
+  const isShown = (popup: HTMLDivElement) =>
+    shownPopups.has(popup) || popup.matches(":popover-open");
+
+  const hide = (popup: HTMLDivElement) => {
+    if (typeof popup.hidePopover === "function") {
+      if (isShown(popup)) popup.hidePopover();
+      popup.hidden = false;
+    } else {
+      popup.hidden = true;
+    }
+    shownPopups.delete(popup);
+  };
+
+  const position = () => {
+    const { popup, trigger } = parts();
+    popup.style.inset = "0 auto auto 0";
+    popup.style.margin = "0";
+    popup.style.position = "fixed";
+    if (!openState) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const offset = sideOffset();
+    popup.style.setProperty("--anchor-left", `${rect.left}px`);
+    popup.style.setProperty("--anchor-top", `${rect.top}px`);
+    popup.style.setProperty("--anchor-width", `${rect.width}px`);
+    popup.style.setProperty("--anchor-height", `${rect.height}px`);
+    if (side() === "bottom") {
+      popup.style.transform = `translate3d(${rect.left}px, ${rect.bottom + offset}px, 0)`;
+    } else if (side() === "top") {
+      popup.style.transform = `translate3d(${rect.left}px, ${rect.top - offset}px, 0) translateY(-100%)`;
+    } else if (side() === "right") {
+      popup.style.transform = `translate3d(${rect.right + offset}px, ${rect.top}px, 0)`;
+    } else {
+      popup.style.transform = `translate3d(${rect.left - offset}px, ${rect.top}px, 0) translateX(-100%)`;
+    }
+  };
+
+  const sync = () => {
+    const { popup, trigger } = parts();
+    if (!initialized) {
+      initialized = true;
+      if (!controlled) openState = defaultOpen();
+    }
+
+    if (activePopup && activePopup !== popup) hide(activePopup);
+    activePopup = popup;
+
+    popup.id ||= nextId("bwc-popover-popup");
+    popup.dataset.testid ||= "bwc-popover-popup";
+    popup.setAttribute("popover", "auto");
+    popup.setAttribute("role", "dialog");
+    trigger.id ||= nextId("bwc-popover-trigger");
+    trigger.disabled = disabled();
+    trigger.setAttribute("aria-haspopup", "dialog");
+    trigger.setAttribute("aria-controls", popup.id);
+    decorateButton(trigger, "popover-trigger", "bwc-popover-trigger", trigger.className);
+    applyPartClass(trigger, "popover-trigger", triggerClass());
+    applyPartClass(popup, "popover-popup", popupClass());
+
+    const closeButtons = [
+      ...popup.querySelectorAll<HTMLButtonElement>("button[data-close]"),
+    ].filter((button) => belongsToHost(button, host));
+    for (const button of closeButtons) {
+      button.id ||= nextId("bwc-popover-close");
+      decorateButton(button, "popover-close", "bwc-popover-close", button.className);
+      applyPartClass(button, "popover-close", closeClass());
+    }
+
+    trigger.setAttribute("aria-expanded", String(openState));
+    for (const node of [trigger, popup]) {
+      node.toggleAttribute("data-open", openState);
+      node.toggleAttribute("data-closed", !openState);
+      node.toggleAttribute("data-disabled", disabled());
+    }
+    popup.dataset.side = side();
+
+    if (openState && !isShown(popup)) {
+      try {
+        if (typeof popup.showPopover === "function") {
+          popup.hidden = false;
+          popup.showPopover({ source: trigger });
+        } else {
+          popup.hidden = false;
+        }
+        shownPopups.add(popup);
+      } catch (error) {
+        openState = false;
+        if (typeof popup.showPopover !== "function") popup.hidden = true;
+        throw error;
       }
-    };
-    const click = (event: Event) => {
+    } else if (!openState) {
+      hide(popup);
+    }
+    position();
+  };
+
+  const requestOpen = (next: boolean) => {
+    if (disabled() || next === openState) return;
+    emit(host, onOpenChange(), "open-change", "open", next);
+    if (controlled) return;
+
+    openState = next;
+    try {
+      sync();
+    } catch (error) {
+      openState = !next;
+      throw error;
+    }
+  };
+
+  onMount(() => {
+    // Validate cardinality and native host types before creating effects or listeners.
+    parts();
+    const view = host.ownerDocument.defaultView;
+    let stopObserver: (() => void) | undefined;
+    let stopEffect: (() => void) | undefined;
+
+    const click = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      if (target.closest(`button[is="${BWC_POPOVER_TRIGGER_TAG}"]`)) {
-        requestOpen(!state.open);
+      const { trigger } = parts();
+      if (trigger.contains(target)) {
+        requestOpen(!openState);
+        return;
       }
-      if (target.closest(`button[is="${BWC_POPOVER_CLOSE_TAG}"]`)) requestOpen(false);
+      const close = target.closest<HTMLButtonElement>("button[data-close]");
+      if (close && belongsToHost(close, host)) requestOpen(false);
     };
     const toggle = (event: Event) => {
-      const popup = element.querySelector<HTMLDivElement>(`div[is="${BWC_POPOVER_POPUP_TAG}"]`);
+      const { popup } = parts();
       const nextState = (event as ToggleEvent).newState;
-      // Programmatic hides follow a state change; only native closes need synchronization.
-      if (event.target !== popup || nextState !== "closed" || !state.open) return;
-      emit(element, state.onOpenChange, "open-change", "open", false);
-      if (state.controlled) {
-        // Reopen after the native toggle finishes so the browser accepts the controlled state.
+      if (event.target !== popup || nextState !== "closed" || !openState) return;
+      shownPopups.delete(popup);
+      emit(host, onOpenChange(), "open-change", "open", false);
+      if (controlled) {
         queueMicrotask(() => {
-          if (element.isConnected && state.open) sync();
+          if (host.isConnected && openState) sync();
         });
       } else {
-        state.open = false;
+        openState = false;
         sync();
       }
     };
-    element.addEventListener("click", click);
-    element.addEventListener("toggle", toggle, true);
-    addEventListener("resize", position);
-    addEventListener("scroll", position, true);
-    const observer = observeChildren(element, sync);
-    const dispose = useEffects(() => {
-      if (props.open() !== null) {
-        state.controlled = true;
-        state.open = true;
-      } else if (state.controlled) {
-        state.open = false;
-      }
-      sync();
-    });
-
-    return {
-      disconnect() {
-        dispose();
-        element.removeEventListener("click", click);
-        element.removeEventListener("toggle", toggle, true);
-        removeEventListener("resize", position);
-        removeEventListener("scroll", position, true);
-        observer.disconnect();
-      },
+    const cleanup = () => {
+      stopObserver?.();
+      stopEffect?.();
+      host.removeEventListener("click", click);
+      host.removeEventListener("toggle", toggle, true);
+      view?.removeEventListener("resize", position);
+      view?.removeEventListener("scroll", position, true);
+      if (activePopup) hide(activePopup);
+      activePopup = null;
     };
-  },
-  () => {
-    const emptyProperties = {} as const;
-    defineComponent<unknown, HTMLButtonElement, typeof emptyProperties>(
-      "trigger",
-      HTMLButtonElement,
-      emptyProperties,
-      (element) => {
-        decorateButton(element, "popover-trigger", BWC_POPOVER_TRIGGER_TAG, element.className);
-      },
-    );
-    defineComponent<unknown, HTMLDivElement, typeof emptyProperties>(
-      "popup",
-      HTMLDivElement,
-      emptyProperties,
-      (element) => {
-        element.classList.add("popover-popup");
-        element.dataset.testid ||= BWC_POPOVER_POPUP_TAG;
-      },
-    );
-    defineComponent<unknown, HTMLButtonElement, typeof emptyProperties>(
-      "close",
-      HTMLButtonElement,
-      emptyProperties,
-      (element) => {
-        decorateButton(element, "popover-close", BWC_POPOVER_CLOSE_TAG, element.className);
-      },
-    );
-  },
-);
+
+    try {
+      sync();
+      host.addEventListener("click", click);
+      host.addEventListener("toggle", toggle, true);
+      view?.addEventListener("resize", position);
+      view?.addEventListener("scroll", position, true);
+      stopEffect = effect(() => {
+        const next = open();
+        if (next) {
+          controlled = true;
+          openState = true;
+        } else if (controlled) {
+          openState = false;
+        }
+        sync();
+      });
+      stopObserver = observeSlotSubtree(host, sync, ["class", "data-close"]);
+      return cleanup;
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+  });
+
+  return html`<slot name="trigger"></slot><slot name="popup"></slot>`;
+});

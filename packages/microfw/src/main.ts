@@ -1,7 +1,8 @@
-// Standalone consumers must use this bundled factory; separate copies cannot share subscriptions.
-export { signal } from "alien-signals";
+// Standalone consumers must use this bundled registry; separate copies cannot share subscriptions.
+export { effect, signal } from "alien-signals";
 import { renderWithProps } from "./component-props";
-export { useProp } from "./component-props";
+export { onMount, useHost, useProp } from "./component-props";
+export type { PropOptions, Signal } from "./component-props";
 import {
   bindTemplateBindings,
   extractAttributeBindings,
@@ -21,62 +22,68 @@ const MARKER_SEPARATOR = ":";
 let templateId = 0;
 
 // A render result is reusable across disconnects; reconnecting only recreates bindings.
-export function defineComponent(
+export function defineComponent<Element extends HTMLElement = HTMLElement>(
   componentName: string,
   render: () => HtmlTemplate,
   elementName?: string,
-): void {
+): { new (): Element } {
   const elementConstructor = elementName
     ? (document.createElement(elementName).constructor as typeof HTMLElement)
     : HTMLElement;
 
-  customElements.define(
-    componentName,
-    class extends elementConstructor {
-      readonly #rendered = renderWithProps(this, render);
-      #propertySlot: HTMLSlotElement | null;
-      #unbind: (() => void) | undefined;
+  const ComponentElement = class extends elementConstructor {
+    readonly #rendered = renderWithProps(this, render);
+    #propertySlot: HTMLSlotElement | null;
+    #unbind: (() => void) | undefined;
 
-      constructor() {
-        super();
+    constructor() {
+      super();
 
-        const shadowRoot = this.attachShadow({ mode: "open" });
-        shadowRoot.append(this.#rendered.result.fragment);
-        this.#propertySlot = shadowRoot.querySelector('slot[name="__properties"]');
-      }
+      const shadowRoot = this.attachShadow({ mode: "open" });
+      shadowRoot.append(this.#rendered.result.fragment);
+      this.#propertySlot = shadowRoot.querySelector('slot[name="__properties"]');
+    }
 
-      connectedCallback(): void {
-        // Host mutation is deferred because custom-element constructors may not add attributes.
-        const propertySlot = this.#propertySlot;
-        if (propertySlot) {
-          this.#propertySlot = null;
-          this.classList.add(...propertySlot.classList);
-          for (const attribute of propertySlot.attributes) {
-            if (attribute.name !== "name" && !this.hasAttribute(attribute.name)) {
-              this.setAttribute(attribute.name, attribute.value);
-            }
+    connectedCallback(): void {
+      // Host mutation is deferred because custom-element constructors may not add attributes.
+      const propertySlot = this.#propertySlot;
+      if (propertySlot) {
+        this.#propertySlot = null;
+        this.classList.add(...propertySlot.classList);
+        for (const attribute of propertySlot.attributes) {
+          if (attribute.name !== "name" && !this.hasAttribute(attribute.name)) {
+            this.setAttribute(attribute.name, attribute.value);
           }
         }
-
-        this.#unbind?.();
-        this.#rendered.reconnect();
-        try {
-          this.#unbind = this.#rendered.result.bind();
-        } catch (error) {
-          this.#rendered.dispose();
-          throw error;
-        }
       }
 
-      disconnectedCallback(): void {
-        // Template bindings stop before the prop signals they may read.
+      this.#unbind?.();
+      this.#rendered.reconnect();
+      try {
+        this.#unbind = this.#rendered.result.bind();
+        this.#rendered.mount();
+      } catch (error) {
         this.#unbind?.();
         this.#unbind = undefined;
         this.#rendered.dispose();
+        throw error;
       }
-    },
+    }
+
+    disconnectedCallback(): void {
+      // Template bindings stop before the prop signals they may read.
+      this.#unbind?.();
+      this.#unbind = undefined;
+      this.#rendered.dispose();
+    }
+  };
+
+  customElements.define(
+    componentName,
+    ComponentElement,
     elementName ? { extends: elementName } : undefined,
   );
+  return ComponentElement as unknown as { new (): Element };
 }
 
 // Attributes require complete markers; text supports markers mixed with static content.

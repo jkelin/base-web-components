@@ -14,6 +14,15 @@ type OtpApi = HTMLElement & {
   hiddenInputClass: string;
   onValueChange: ((value: string) => void) | null;
   onValueComplete: ((value: string) => void) | null;
+  validationType: "numeric" | "alpha" | "alphanumeric" | "none";
+  mask: boolean;
+  disabled: boolean;
+  readOnly: boolean;
+  required: boolean;
+  name: string;
+  form: string;
+  autocomplete: string;
+  inputMode: string;
 };
 
 function fields(root: HTMLElement): HTMLInputElement[] {
@@ -49,10 +58,17 @@ describe("generated OTP fields", () => {
     expect(root.querySelectorAll("input")).toHaveLength(5);
     expect(fields(root).every((field) => field.getAttribute("is") === null)).toBe(true);
     expect(fields(root).every((field) => field.maxLength === 1)).toBe(true);
+    expect(fields(root).every((field) => field.slot === "field")).toBe(true);
+    expect(
+      root.querySelector<HTMLInputElement>(`[data-testid="${BWC_OTP_HIDDEN_INPUT_TEST_ID}"]`)?.slot,
+    ).toBe("form-control");
+    const fieldSlot = root.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="field"]');
+    expect(fieldSlot?.assignedElements()).toEqual(fields(root));
+    expect(root.shadowRoot?.querySelector('slot[name="form-control"]')).not.toBeNull();
     expect(() => {
       root.length = 0;
     }).toThrow(/length must be a positive integer/);
-    expect(() => root.setAttribute("length", "2.5")).toThrow(/length must be a positive integer/);
+    expect(root.length).toBe(4);
   });
 
   it("coordinates paste, arrows, and backspace", () => {
@@ -67,7 +83,11 @@ describe("generated OTP fields", () => {
     inputs[3]!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "ArrowLeft" }));
     expect(document.activeElement).toBe(inputs[2]);
     inputs[2]!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Backspace" }));
+    inputs[1]!.focus();
     expect(root.value).toBe("124");
+    inputs[1]!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Delete" }));
+    expect(root.value).toBe("14");
+    expect(document.activeElement).toBe(inputs[1]);
   });
 
   it("supports uncontrolled completion callbacks and composed events", () => {
@@ -83,13 +103,16 @@ describe("generated OTP fields", () => {
     );
 
     inputs[0]!.value = "1";
-    inputs[0]!.dispatchEvent(new Event("input"));
+    inputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
     inputs[1]!.value = "2";
-    inputs[1]!.dispatchEvent(new Event("input"));
+    inputs[1]!.dispatchEvent(new Event("input", { bubbles: true }));
     expect(root.value).toBe("12");
     expect(change).toHaveBeenCalledTimes(2);
     expect(complete).toHaveBeenCalledWith("12");
     expect(event).toHaveBeenCalledWith({ value: "12" });
+    inputs[1]!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(change).toHaveBeenCalledTimes(2);
+    expect(complete).toHaveBeenCalledTimes(1);
   });
 
   it("keeps controlled state while reporting requested values", () => {
@@ -100,9 +123,13 @@ describe("generated OTP fields", () => {
     root.onValueChange = change;
 
     inputs[0]!.value = "9";
-    inputs[0]!.dispatchEvent(new Event("input"));
+    inputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
     expect(change).toHaveBeenCalledWith("92");
     expect(root.value).toBe("12");
+    expect(inputs.map((field) => field.value)).toEqual(["1", "2"]);
+    inputs[0]!.value = "1";
+    inputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(change).toHaveBeenCalledTimes(1);
     expect(inputs.map((field) => field.value)).toEqual(["1", "2"]);
   });
 
@@ -132,6 +159,35 @@ describe("generated OTP fields", () => {
     expect(fields(root).map((field) => field.value)).toEqual(["9", "8", "7"]);
   });
 
+  it("restores the uncontrolled default on form reset", () => {
+    document.body.innerHTML =
+      '<form><bwc-otp length="4" default-value="1234" name="code"></bwc-otp></form>';
+    const form = document.querySelector<HTMLFormElement>("form");
+    const root = document.querySelector<OtpApi>("bwc-otp");
+    if (!form || !root) throw new Error("resettable OTP did not mount");
+
+    fields(root)[0]!.value = "9";
+    fields(root)[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(root.value).toBe("9234");
+    form.reset();
+    expect(root.value).toBe("1234");
+    expect(fields(root).map((field) => field.value)).toEqual(["1", "2", "3", "4"]);
+  });
+
+  it("keeps controlled state coherent when an external owner form resets", () => {
+    document.body.innerHTML =
+      '<form id="owner"></form><bwc-otp length="4" form="owner" default-value="1234" name="code"></bwc-otp>';
+    const form = document.querySelector<HTMLFormElement>("form");
+    const root = document.querySelector<OtpApi>("bwc-otp");
+    if (!form || !root) throw new Error("externally owned OTP did not mount");
+
+    root.value = "9876";
+    form.reset();
+    expect(root.value).toBe("9876");
+    expect(fields(root).map((field) => field.value)).toEqual(["9", "8", "7", "6"]);
+    expect([...new FormData(form).entries()]).toEqual([["code", "9876"]]);
+  });
+
   it("applies part classes and configures one form input", () => {
     const root = mount(2, 'field-class="shared-field" hidden-input-class="submission" name="code"');
     const inputs = fields(root);
@@ -151,6 +207,37 @@ describe("generated OTP fields", () => {
     root.hiddenInputClass = "next-hidden";
     expect(inputs[0]?.className).toBe("otp-field next-field");
     expect(hidden?.className).toBe("otp-hidden-input next-hidden");
+  });
+
+  it("uses native form validity and submission gating", () => {
+    document.body.innerHTML =
+      '<form id="verification"><bwc-otp length="2" name="code" required></bwc-otp></form>';
+    const form = document.querySelector<HTMLFormElement>("form");
+    const root = document.querySelector<OtpApi>("bwc-otp");
+    if (!form || !root) throw new Error("form OTP did not mount");
+
+    expect(form.checkValidity()).toBe(false);
+    fields(root)[0]!.value = "1";
+    fields(root)[0]!.dispatchEvent(new Event("input", { bubbles: true }));
+    fields(root)[1]!.value = "2";
+    fields(root)[1]!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(form.checkValidity()).toBe(true);
+    expect([...new FormData(form).entries()]).toEqual([["code", "12"]]);
+
+    root.disabled = true;
+    expect(fields(root).every((field) => field.disabled)).toBe(true);
+    expect(form.checkValidity()).toBe(true);
+    expect([...new FormData(form).entries()]).toEqual([]);
+  });
+
+  it("preserves authored light-DOM content while resizing generated fields", () => {
+    document.body.innerHTML = '<bwc-otp length="2"><span data-author>Help</span></bwc-otp>';
+    const root = document.querySelector<OtpApi>("bwc-otp");
+    if (!root) throw new Error("authored OTP did not mount");
+
+    root.length = 3;
+    expect(root.querySelector("[data-author]")?.textContent).toBe("Help");
+    expect(fields(root)).toHaveLength(3);
   });
 });
 

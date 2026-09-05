@@ -1,457 +1,271 @@
-import { signal } from "alien-signals";
+import { defineComponent, effect, html, onMount, signal, useHost, useProp } from "microfw";
 import {
-  booleanValue,
-  callbackValue,
-  defineComponent,
+  booleanProp,
+  callbackProp,
   emit,
-  enumValue,
+  enumProp,
   nextId,
-  useEffects,
-  type ChangeCallback,
-  type Signal,
+  observeSlotSubtree,
+  requireSlottedElement,
+  slottedElements,
+  stringProp,
 } from "../shared";
 
 export const BWC_TABS_TAG = "bwc-tabs";
-export const BWC_TABS_LIST_TAG = `${BWC_TABS_TAG}-list`;
-export const BWC_TAB_TAG = "bwc-tab";
-export const BWC_TAB_PANEL_TAG = "bwc-tab-panel";
 
 type Orientation = "horizontal" | "vertical";
 type ActivationMode = "automatic" | "manual";
+type ChangeCallback<Value> = ((value: Value) => void) | null;
 
-type TabsContext = {
-  activationMode: Signal<ActivationMode>;
-  controlled: boolean;
-  disabled: Signal<boolean>;
-  orientation: Signal<Orientation>;
-  revision: Signal<number>;
-  value: Signal<string>;
-  onValueChange: ChangeCallback<string>;
-  ownsTab: (tab: HTMLButtonElement) => boolean;
-  panelFor: (value: string) => HTMLElement | undefined;
-  tabFor: (value: string) => HTMLButtonElement | undefined;
-  registerList: (list: HTMLElement) => void;
-  unregisterList: (list: HTMLElement) => void;
-  registerPanel: (panel: HTMLElement, value: string) => void;
-  updatePanel: (panel: HTMLElement, value: string) => void;
-  unregisterPanel: (panel: HTMLElement) => void;
-  registerTab: (tab: HTMLButtonElement, value: string) => void;
-  updateTab: (tab: HTMLButtonElement, value: string) => void;
-  unregisterTab: (tab: HTMLButtonElement) => void;
-  select: (tab: HTMLButtonElement) => void;
-  moveFocus: (tab: HTMLButtonElement, key: string) => boolean;
-};
-
-type TabsProperties = {
-  value: string;
-  defaultValue: string;
-  orientation: Orientation;
+type TabsApi = HTMLElement & {
   activationMode: ActivationMode;
+  defaultValue: string;
   disabled: boolean;
   onValueChange: ChangeCallback<string>;
+  orientation: Orientation;
+  value: string;
 };
 
-const tabsProperties = {
-  value: "value",
-  defaultValue: "default-value",
-  orientation: "orientation",
-  activationMode: "activation-mode",
-  disabled: "disabled",
-  onValueChange: null,
-} as const;
+type TabsParts = {
+  buttons: HTMLButtonElement[];
+  list: HTMLDivElement;
+  panels: HTMLElement[];
+  panelByValue: Map<string, HTMLElement>;
+};
 
 const orientations = ["horizontal", "vertical"] as const;
 const activationModes = ["automatic", "manual"] as const;
 
-export const BwcTabsElement = defineComponent<TabsContext, HTMLElement, typeof tabsProperties>(
-  BWC_TABS_TAG,
-  HTMLElement,
-  tabsProperties,
-  (element, props, context, properties) => {
-    const previous = context();
-    let state: TabsContext;
+function tabsParts(host: HTMLElement): TabsParts {
+  const list = requireSlottedElement(host, "list", HTMLDivElement);
+  const buttons = [...list.children].filter(
+    (child): child is HTMLButtonElement => child instanceof HTMLButtonElement,
+  );
+  const panels = slottedElements(host, "panel", HTMLElement);
+  if (panels.some((panel) => panel.localName !== "section")) {
+    throw new TypeError("tabs panels must be section elements");
+  }
 
-    if ("value" in previous) {
-      state = previous;
-    } else {
-      const value = signal(props.value() ?? "");
-      const orientation = signal<Orientation>(
-        enumValue(props.orientation(), orientations, "horizontal", "orientation"),
-      );
-      const activationMode = signal<ActivationMode>(
-        enumValue(props.activationMode(), activationModes, "automatic", "activationMode"),
-      );
-      const disabled = signal(props.disabled() !== null);
-      const revision = signal(0);
-      const lists = new Set<HTMLElement>();
-      const tabs = new Map<HTMLButtonElement, string>();
-      const panels = new Map<HTMLElement, string>();
+  const buttonValues = buttons.map((button) => button.value);
+  const panelValues = panels.map((panel) => panel.dataset.value ?? "");
+  if (
+    buttonValues.some((value) => !value) ||
+    panelValues.some((value) => !value) ||
+    new Set(buttonValues).size !== buttonValues.length ||
+    new Set(panelValues).size !== panelValues.length
+  ) {
+    throw new TypeError("tab and panel values must be unique and nonempty");
+  }
+  const panelsByValue = new Map(panels.map((panel, index) => [panelValues[index]!, panel]));
+  if (buttons.length !== panels.length || buttonValues.some((value) => !panelsByValue.has(value))) {
+    throw new TypeError("tabs require matched button and panel values");
+  }
 
-      const touch = () => revision(revision() + 1);
-      const validate = (
-        records: ReadonlyMap<HTMLElement, string>,
-        owner: HTMLElement,
-        next: string,
-        kind: "tab" | "tab panel",
-      ) => {
-        // A reconnect may re-register the same owner; only another owner is a duplicate.
-        if (!next) throw new TypeError(`${kind} value must be nonempty`);
-        for (const [candidate, candidateValue] of records) {
-          if (candidate !== owner && candidateValue === next) {
-            throw new TypeError("tab and panel values must be unique and nonempty");
-          }
+  return { buttons, list, panels, panelByValue: panelsByValue };
+}
+
+export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
+  const host = useHost<TabsApi>();
+  const assignedValue = Object.hasOwn(host, "value");
+  const controlled = signal(host.hasAttribute("value") || assignedValue);
+  const currentValue = signal("");
+  const itemDisabled = new WeakMap<HTMLButtonElement, boolean>();
+  const appliedDisabled = new WeakMap<HTMLButtonElement, boolean>();
+  const previousButtonValues = new WeakMap<HTMLButtonElement, string>();
+  let initialized = false;
+
+  const orientation = useProp<Orientation>(
+    "orientation",
+    enumProp("orientation", orientations, "horizontal"),
+  );
+  const activationMode = useProp<ActivationMode>(
+    "activationMode",
+    enumProp("activation-mode", activationModes, "automatic"),
+  );
+  const disabled = useProp("disabled", booleanProp("disabled"));
+  const defaultValue = useProp("defaultValue", stringProp("default-value"));
+  const value = useProp("value", {
+    ...stringProp("value"),
+    defaultValue: "",
+    fromAttribute: (raw) => {
+      controlled(raw !== null);
+      if (initialized && raw === null) currentValue("");
+      return raw ?? "";
+    },
+    toAttribute: (next) => (controlled() ? next : null),
+    get: () => currentValue(),
+    onSet: (next, commit) => {
+      if (!next) throw new TypeError("value must be nonempty");
+      controlled(true);
+      commit(next);
+      currentValue(next);
+    },
+  });
+  const onValueChange = useProp<ChangeCallback<string>>(
+    "onValueChange",
+    callbackProp<string>("onValueChange"),
+  );
+
+  const sync = () => {
+    const parts = tabsParts(host);
+    if (!controlled()) {
+      for (const button of parts.buttons) {
+        const previousValue = previousButtonValues.get(button);
+        if (previousValue === currentValue() && previousValue !== button.value) {
+          currentValue(button.value);
+          break;
         }
-      };
-      const registerTab = (tab: HTMLButtonElement, tabValue: string) => {
-        validate(tabs, tab, tabValue, "tab");
-        tabs.set(tab, tabValue);
-        if (!state.controlled && !value()) {
-          const preferred = props.defaultValue();
-          if ((!preferred || preferred === tabValue) && !tab.hasAttribute("disabled")) {
-            value(tabValue);
-          }
-        }
-        touch();
-      };
-      const updateTab = (tab: HTMLButtonElement, tabValue: string) => {
-        const previousValue = tabs.get(tab);
-        validate(tabs, tab, tabValue, "tab");
-        tabs.set(tab, tabValue);
-        if (!state.controlled && previousValue === value()) value(tabValue);
-        touch();
-      };
-      const unregisterTab = (tab: HTMLButtonElement) => {
-        tabs.delete(tab);
-        touch();
-      };
-      const registerPanel = (panel: HTMLElement, panelValue: string) => {
-        validate(panels, panel, panelValue, "tab panel");
-        panels.set(panel, panelValue);
-        touch();
-      };
-      const updatePanel = (panel: HTMLElement, panelValue: string) => {
-        validate(panels, panel, panelValue, "tab panel");
-        panels.set(panel, panelValue);
-        touch();
-      };
-      const unregisterPanel = (panel: HTMLElement) => {
-        panels.delete(panel);
-        touch();
-      };
-      const select = (tab: HTMLButtonElement) => {
-        const next = tabs.get(tab);
-        if (!next || disabled() || tab.disabled) return;
-        emit(element, state.onValueChange, "value-change", "value", next);
-        if (!state.controlled) value(next);
-      };
-      const enabledTabs = () => [...tabs.keys()].filter((tab) => !tab.disabled);
-      const moveFocus = (tab: HTMLButtonElement, key: string) => {
-        const enabled = enabledTabs();
-        const index = enabled.indexOf(tab);
-        if (index < 0 || enabled.length === 0) return false;
-        const previousKey = orientation() === "horizontal" ? "ArrowLeft" : "ArrowUp";
-        const nextKey = orientation() === "horizontal" ? "ArrowRight" : "ArrowDown";
-        let next: HTMLButtonElement | undefined;
-        if (key === previousKey) next = enabled[(index - 1 + enabled.length) % enabled.length];
-        if (key === nextKey) next = enabled[(index + 1) % enabled.length];
-        if (key === "Home") next = enabled[0];
-        if (key === "End") next = enabled.at(-1);
-        next?.focus();
-        return Boolean(next);
-      };
-
-      state = {
-        activationMode,
-        controlled: props.value() !== null,
-        disabled,
-        onValueChange: null,
-        orientation,
-        revision,
-        ownsTab: (tab) => tabs.has(tab),
-        value,
-        panelFor: (panelValue) => {
-          revision();
-          for (const [panel, registeredValue] of panels) {
-            if (registeredValue === panelValue) return panel;
-          }
-          return undefined;
-        },
-        tabFor: (tabValue) => {
-          revision();
-          for (const [tab, registeredValue] of tabs) {
-            if (registeredValue === tabValue) return tab;
-          }
-          return undefined;
-        },
-        registerList: (list) => {
-          if (lists.size > 0 && !lists.has(list)) throw new TypeError("tabs accepts one list");
-          lists.add(list);
-          touch();
-        },
-        unregisterList: (list) => {
-          lists.delete(list);
-          touch();
-        },
-        registerPanel,
-        updatePanel,
-        unregisterPanel,
-        registerTab,
-        updateTab,
-        unregisterTab,
-        select,
-        moveFocus,
-      };
-      context(state);
+      }
     }
 
-    // Reconnects retain context state while rebuilding only connection-scoped effects and listeners.
-    const { activationMode, disabled, orientation, value } = state;
-
-    properties.install({
-      value: {
-        get: () => value(),
-        set: (next) => {
-          if (typeof next !== "string" || !next) {
-            throw new TypeError("tabs value must be nonempty");
-          }
-          state.controlled = true;
-          element.setAttribute("value", next);
-        },
-      },
-      defaultValue: {
-        get: () => props.defaultValue() ?? "",
-        set: (next) => element.setAttribute("default-value", String(next)),
-      },
-      orientation: {
-        get: () => orientation(),
-        set: (next) => {
-          const parsed = enumValue(String(next), orientations, "horizontal", "orientation");
-          element.setAttribute("orientation", parsed);
-        },
-      },
-      activationMode: {
-        get: () => activationMode(),
-        set: (next) => {
-          const parsed = enumValue(String(next), activationModes, "automatic", "activationMode");
-          element.setAttribute("activation-mode", parsed);
-        },
-      },
-      disabled: {
-        get: () => disabled(),
-        set: (next) => element.toggleAttribute("disabled", booleanValue(next, "disabled")),
-      },
-      onValueChange: {
-        get: () => state.onValueChange,
-        set: (next) => {
-          state.onValueChange = callbackValue<string>(next, "onValueChange");
-        },
-      },
-    });
-
-    const dispose = useEffects(() => {
-      const controlledValue = props.value();
-      if (controlledValue !== null) {
-        state.controlled = true;
-        value(controlledValue);
-      } else if (state.controlled) {
-        value("");
+    if (!initialized) {
+      initialized = true;
+      if (controlled()) currentValue(value());
+      else {
+        const preferred = defaultValue();
+        const initial = preferred
+          ? parts.buttons.find((button) => button.value === preferred && !button.disabled)
+          : parts.buttons.find((button) => !button.disabled);
+        currentValue(initial?.value ?? "");
       }
-      orientation(enumValue(props.orientation(), orientations, "horizontal", "orientation"));
-      activationMode(
-        enumValue(props.activationMode(), activationModes, "automatic", "activationMode"),
-      );
-      disabled(props.disabled() !== null);
-    });
-    const registeredTab = (event: Event) =>
-      event
-        .composedPath()
-        .find(
-          (target): target is HTMLButtonElement =>
-            target instanceof HTMLButtonElement && state.ownsTab(target),
-        );
-    const click = (event: Event) => {
-      const tab = registeredTab(event);
-      if (tab) state.select(tab);
-    };
-    const focus = (event: FocusEvent) => {
-      const tab = registeredTab(event);
-      if (tab && activationMode() === "automatic") state.select(tab);
-    };
-    const keydown = (event: KeyboardEvent) => {
-      const tab = registeredTab(event);
-      if (!tab) return;
-      if (state.moveFocus(tab, event.key)) event.preventDefault();
-      if (activationMode() === "manual" && (event.key === "Enter" || event.key === " ")) {
-        event.preventDefault();
-        state.select(tab);
+    } else if (controlled()) {
+      currentValue(value());
+    }
+
+    const rootDisabled = disabled();
+    const selected = currentValue();
+    host.toggleAttribute("data-disabled", rootDisabled);
+    parts.list.classList.add("tabs-list");
+    parts.list.dataset.testid ||= "bwc-tabs-list";
+    parts.list.setAttribute("role", "tablist");
+    parts.list.setAttribute("aria-orientation", orientation());
+
+    for (const button of parts.buttons) {
+      const previouslyApplied = appliedDisabled.get(button);
+      if (previouslyApplied === undefined || button.disabled !== previouslyApplied) {
+        itemDisabled.set(button, button.disabled);
       }
+      const effectiveDisabled = rootDisabled || itemDisabled.get(button) === true;
+      const active = selected === button.value;
+      const panel = parts.panelByValue.get(button.value)!;
+      button.disabled = effectiveDisabled;
+      appliedDisabled.set(button, effectiveDisabled);
+      previousButtonValues.set(button, button.value);
+      button.id ||= nextId("bwc-tab");
+      panel.id ||= nextId("bwc-tab-panel");
+      button.classList.add("tab");
+      button.dataset.testid ||= `bwc-tab-${button.value}`;
+      button.type = "button";
+      button.style.cursor = effectiveDisabled ? "not-allowed" : "pointer";
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(active));
+      button.setAttribute("aria-controls", panel.id);
+      button.tabIndex = active ? 0 : -1;
+      button.toggleAttribute("data-active", active);
+      button.toggleAttribute("data-inactive", !active);
+      button.toggleAttribute("data-disabled", effectiveDisabled);
+      panel.classList.add("tab-panel");
+      panel.dataset.testid ||= `bwc-tab-panel-${button.value}`;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", button.id);
+      panel.hidden = !active;
+      panel.toggleAttribute("data-active", active);
+      panel.toggleAttribute("data-inactive", !active);
+      panel.toggleAttribute("data-disabled", effectiveDisabled);
+    }
+  };
+
+  const buttonFromEvent = (event: Event): HTMLButtonElement | undefined => {
+    const target = event.composedPath().find((entry) => entry instanceof HTMLButtonElement);
+    if (!(target instanceof HTMLButtonElement)) return undefined;
+    const { buttons } = tabsParts(host);
+    return buttons.includes(target) && target.closest(BWC_TABS_TAG) === host ? target : undefined;
+  };
+
+  const select = (button: HTMLButtonElement) => {
+    if (disabled() || button.disabled) return;
+    const next = button.value;
+    if (!next || (!controlled() && next === currentValue())) return;
+    emit(host, onValueChange(), "value-change", "value", next);
+    if (!controlled()) currentValue(next);
+    sync();
+  };
+  let pointerDownButton: HTMLButtonElement | undefined;
+  let pointerFocusSelection: HTMLButtonElement | undefined;
+
+  const pointerdown = (event: PointerEvent) => {
+    pointerDownButton = buttonFromEvent(event);
+    pointerFocusSelection = undefined;
+  };
+  const click = (event: Event) => {
+    const button = buttonFromEvent(event);
+    if (!button) return;
+    const selectedOnPointerFocus =
+      event instanceof MouseEvent && event.detail > 0 && pointerFocusSelection === button;
+    pointerDownButton = undefined;
+    pointerFocusSelection = undefined;
+    if (!selectedOnPointerFocus) select(button);
+  };
+  const focus = (event: FocusEvent) => {
+    const button = buttonFromEvent(event);
+    if (!button || activationMode() !== "automatic") return;
+    if (pointerDownButton === button) pointerFocusSelection = button;
+    select(button);
+  };
+  const keydown = (event: KeyboardEvent) => {
+    const button = buttonFromEvent(event);
+    if (!button) return;
+    const { buttons } = tabsParts(host);
+    const enabled = buttons.filter((candidate) => !candidate.disabled);
+    const index = enabled.indexOf(button);
+    if (index < 0 || enabled.length === 0) return;
+    const previousKey = orientation() === "horizontal" ? "ArrowLeft" : "ArrowUp";
+    const nextKey = orientation() === "horizontal" ? "ArrowRight" : "ArrowDown";
+    let next: HTMLButtonElement | undefined;
+    if (event.key === previousKey) next = enabled[(index - 1 + enabled.length) % enabled.length];
+    if (event.key === nextKey) next = enabled[(index + 1) % enabled.length];
+    if (event.key === "Home") next = enabled[0];
+    if (event.key === "End") next = enabled.at(-1);
+    if (next) {
+      event.preventDefault();
+      next.focus();
+    } else if (activationMode() === "manual" && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      select(button);
+    }
+  };
+
+  onMount(() => {
+    sync();
+    const stopEffect = effect(sync);
+    let stopObserving: (() => void) | undefined;
+    try {
+      stopObserving = observeSlotSubtree(host, sync, ["slot", "value", "data-value", "disabled"]);
+      host.addEventListener("pointerdown", pointerdown);
+      host.addEventListener("click", click);
+      host.addEventListener("focusin", focus);
+      host.addEventListener("keydown", keydown);
+    } catch (error) {
+      stopObserving?.();
+      stopEffect();
+      host.removeEventListener("pointerdown", pointerdown);
+      host.removeEventListener("click", click);
+      host.removeEventListener("focusin", focus);
+      host.removeEventListener("keydown", keydown);
+      throw error;
+    }
+
+    return () => {
+      pointerDownButton = undefined;
+      pointerFocusSelection = undefined;
+      host.removeEventListener("pointerdown", pointerdown);
+      host.removeEventListener("click", click);
+      host.removeEventListener("focusin", focus);
+      host.removeEventListener("keydown", keydown);
+      stopObserving?.();
+      stopEffect();
     };
-    element.addEventListener("click", click);
-    element.addEventListener("focusin", focus);
-    element.addEventListener("keydown", keydown);
+  });
 
-    return {
-      disconnect() {
-        dispose();
-        element.removeEventListener("click", click);
-        element.removeEventListener("focusin", focus);
-        element.removeEventListener("keydown", keydown);
-      },
-    };
-  },
-  () => {
-    const listProperties = {} as const;
-    defineComponent<TabsContext, HTMLElement, typeof listProperties>(
-      "list",
-      HTMLElement,
-      listProperties,
-      (element, _props, context) => {
-        const state = context();
-        state.registerList(element);
-        element.classList.add("tabs-list");
-        element.dataset.testid ||= BWC_TABS_LIST_TAG;
-        element.style.userSelect = "none";
-        const dispose = useEffects(() => {
-          element.setAttribute("role", "tablist");
-          element.setAttribute("aria-orientation", context().orientation());
-        });
-        return {
-          disconnect() {
-            dispose();
-            state.unregisterList(element);
-          },
-        };
-      },
-    );
-  },
-) as unknown as { new (): HTMLElement & TabsProperties };
-
-const tabProperties = { value: "value", disabled: "disabled" } as const;
-
-export const BwcTabElement = defineComponent<TabsContext, HTMLButtonElement, typeof tabProperties>(
-  BWC_TAB_TAG,
-  HTMLButtonElement,
-  tabProperties,
-  (element, props, context, properties) => {
-    const state = context();
-    let itemDisabled = props.disabled() !== null;
-    let settingDisabled = false;
-    element.id ||= nextId(`${BWC_TAB_TAG}-button`);
-    const forwardedClass = element.className.replace(/(?:^| )tab(?: |$)/g, " ").trim();
-
-    properties.install({
-      value: {
-        get: () => props.value() ?? "",
-        set: (next) => {
-          if (typeof next !== "string" || !next) throw new TypeError("tab value must be nonempty");
-          state.updateTab(element, next);
-          element.setAttribute("value", next);
-        },
-      },
-      disabled: {
-        get: () => element.hasAttribute("disabled"),
-        set: (next) => {
-          itemDisabled = booleanValue(next, "disabled");
-          element.toggleAttribute("data-item-disabled", itemDisabled);
-          state.revision(state.revision() + 1);
-        },
-      },
-    });
-    state.registerTab(element, props.value() ?? "");
-
-    const dispose = useEffects(() => {
-      state.revision();
-      const active = state.value() === (props.value() ?? "");
-      const panel = state.panelFor(props.value() ?? "");
-      const effectiveDisabled = state.disabled() || itemDisabled;
-      settingDisabled = true;
-      element.toggleAttribute("disabled", effectiveDisabled);
-      settingDisabled = false;
-      element.className = forwardedClass ? `tab ${forwardedClass}` : "tab";
-      element.dataset.testid ||= BWC_TAB_TAG;
-      element.type = "button";
-      element.style.userSelect = "none";
-      element.style.cursor = effectiveDisabled ? "not-allowed" : "pointer";
-      element.setAttribute("role", "tab");
-      element.setAttribute("aria-selected", String(active));
-      if (panel) element.setAttribute("aria-controls", panel.id);
-      else element.removeAttribute("aria-controls");
-      element.tabIndex = active ? 0 : -1;
-      element.toggleAttribute("data-active", active);
-      element.toggleAttribute("data-inactive", !active);
-      element.toggleAttribute("data-disabled", effectiveDisabled);
-    });
-
-    return {
-      attributeChanged(name) {
-        if (name === "value") state.updateTab(element, props.value() ?? "");
-        if (name === "disabled" && !settingDisabled) {
-          itemDisabled = props.disabled() !== null;
-          element.toggleAttribute("data-item-disabled", itemDisabled);
-          state.revision(state.revision() + 1);
-        }
-      },
-      disconnect() {
-        dispose();
-        state.unregisterTab(element);
-      },
-    };
-  },
-  undefined,
-  { contextParent: BWC_TABS_TAG, flat: true },
-);
-
-const panelProperties = { value: "value" } as const;
-
-export const BwcTabPanelElement = defineComponent<TabsContext, HTMLElement, typeof panelProperties>(
-  BWC_TAB_PANEL_TAG,
-  HTMLElement,
-  panelProperties,
-  (element, props, context, properties) => {
-    const state = context();
-    element.id ||= nextId(BWC_TAB_PANEL_TAG);
-    element.classList.add("tab-panel");
-    element.dataset.testid ||= BWC_TAB_PANEL_TAG;
-
-    properties.install({
-      value: {
-        get: () => props.value() ?? "",
-        set: (next) => {
-          if (typeof next !== "string" || !next) {
-            throw new TypeError("tab panel value must be nonempty");
-          }
-          state.updatePanel(element, next);
-          element.setAttribute("value", next);
-        },
-      },
-    });
-    state.registerPanel(element, props.value() ?? "");
-
-    const dispose = useEffects(() => {
-      state.revision();
-      const panelValue = props.value() ?? "";
-      const active = state.value() === panelValue;
-      const tab = state.tabFor(panelValue);
-      const labelledBy = tab?.id;
-      element.setAttribute("role", "tabpanel");
-      if (labelledBy) element.setAttribute("aria-labelledby", labelledBy);
-      else element.removeAttribute("aria-labelledby");
-      element.hidden = !active;
-      element.toggleAttribute("data-active", active);
-      element.toggleAttribute("data-inactive", !active);
-      element.toggleAttribute("data-disabled", tab?.disabled ?? state.disabled());
-    });
-
-    return {
-      attributeChanged(name) {
-        if (name === "value") state.updatePanel(element, props.value() ?? "");
-      },
-      disconnect() {
-        dispose();
-        state.unregisterPanel(element);
-      },
-    };
-  },
-  undefined,
-  { contextParent: BWC_TABS_TAG, flat: true },
-);
+  return html`<slot name="list"></slot><slot name="panel"></slot>`;
+});
