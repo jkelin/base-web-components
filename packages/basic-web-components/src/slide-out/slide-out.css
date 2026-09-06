@@ -1,0 +1,49 @@
+/*
+ * Positioning for bwc-slide-out panels (light-DOM `slot="panel"` children).
+ *
+ * The panel is a non-modal drawer fixed to the viewport edge selected by
+ * `data-side`. JavaScript only writes `data-side` plus `data-open` /
+ * `data-closed` state; placement and the slide transition are handled here.
+ * The dismiss overlay lives in shadow DOM (inline styles) so it paints
+ * below the slotted panel without author markup.
+ */
+
+bwc-slide-out > [slot="panel"] {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
+  margin: 0;
+  max-width: min(20rem, calc(100vw - 3rem));
+  width: 20rem;
+  /* Viewport height, not just top/bottom anchoring: an ancestor filter
+     (e.g. the site header backdrop) can contain `fixed`, collapsing the
+     panel to ancestor height. Explicit height keeps it full-height. */
+  height: 100vh;
+  height: 100dvh;
+  visibility: hidden;
+  transition:
+    transform 200ms ease,
+    visibility 200ms;
+}
+
+bwc-slide-out > [slot="panel"][data-side="right"] {
+  right: 0;
+  transform: translateX(100%);
+}
+
+bwc-slide-out > [slot="panel"][data-side="left"] {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+bwc-slide-out > [slot="panel"][data-open] {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  bwc-slide-out > [slot="panel"] {
+    transition: none;
+  }
+}

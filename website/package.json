@@ -1,0 +1,34 @@
+{
+  "name": "website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static docs site for basic-web-components (SolidJS v2 + Vite prerender).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5199",
+    "preview": "vite preview --host 127.0.0.1 --port 4199",
+    "build": "vite build",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src scripts vite.config.ts",
+    "format": "oxfmt --write src scripts vite.config.ts"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.6",
+    "basic-web-components": "workspace:*",
+    "solid-js": "2.0.0-rc.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "happy-dom": "^20.12.0",
+    "marked": "^18.0.11",
+    "shiki": "^4.4.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vite-plugin-solid": "3.0.0-next.27"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}

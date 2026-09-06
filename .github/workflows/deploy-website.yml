@@ -1,0 +1,65 @@
+# GitHub Pages deployment for the docs website.
+#
+# REQUIRED REPO SETTING: Settings → Pages → Build and deployment → Source
+# must be "GitHub Actions". No gh-pages branch is used; this workflow
+# uploads website/dist as the Pages artifact directly.
+#
+# Design notes:
+# - Builds website/ with Bun (bun install + bun run build in website/).
+# - Deploys website/dist ONLY via the official Pages actions
+#   (actions/configure-pages, actions/upload-pages-artifact,
+#   actions/deploy-pages). dist/ stays gitignored — never force-add it.
+# - website/vite.config.ts sets base: "./" and every shell href, chunk
+#   script, and stylesheet link is ./-relative, so pages, llms.txt,
+#   per-page .md routes, and hashed assets all resolve under the
+#   username.github.io/<repo>/ project subpath with no extra config.
+# - Concurrency cancels superseded runs; deploy job needs
+#   pages:write + id-token:write and the github-pages environment.
+
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "packages/basic-web-components/src/**"
+      - ".github/workflows/deploy-website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/configure-pages@v5
+      - run: bun install --frozen-lockfile
+        working-directory: website
+      - run: bun run build
+        working-directory: website
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

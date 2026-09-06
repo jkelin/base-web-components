@@ -116,42 +116,60 @@ describe("state and native dismissal", () => {
   });
 });
 
-describe("fixed positioning", () => {
-  it.each([
-    ["bottom", "translate3d(10px, 45px, 0)"],
-    ["top", "translate3d(10px, 15px, 0) translateY(-100%)"],
-    ["right", "translate3d(35px, 20px, 0)"],
-    ["left", "translate3d(5px, 20px, 0) translateX(-100%)"],
-  ] as const)("positions on the %s without reading popup size", (side, transform) => {
-    const { popup, root, trigger } = createPopover({ defaultOpen: true });
-    root.side = side;
-    root.sideOffset = 5;
-    popup.style.inset = "10px 20px 30px 40px";
-    popup.style.margin = "8px";
-    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
-      bottom: 40,
-      height: 20,
-      left: 10,
-      right: 30,
-      top: 20,
-      width: 20,
-      x: 10,
-      y: 20,
-      toJSON: () => ({}),
-    });
-    vi.spyOn(popup, "getBoundingClientRect").mockImplementation(() => {
-      throw new Error("popup geometry must not be read");
-    });
-    document.body.append(root);
+describe("anchor positioning", () => {
+  it.each([["bottom"], ["top"], ["right"], ["left"]] as const)(
+    "wires the %s side through data-side and --side-offset without measuring geometry",
+    (side) => {
+      const { popup, root, trigger } = createPopover({ defaultOpen: true });
+      root.side = side;
+      root.sideOffset = 5;
+      const triggerRect = vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+        bottom: 40,
+        height: 20,
+        left: 10,
+        right: 30,
+        top: 20,
+        width: 20,
+        x: 10,
+        y: 20,
+        toJSON: () => ({}),
+      });
+      const popupRect = vi.spyOn(popup, "getBoundingClientRect").mockImplementation(() => {
+        throw new Error("popup geometry must not be read");
+      });
+      document.body.append(root);
 
-    expect(popup.style.position).toBe("fixed");
-    expect(popup.style.inset).toBe("0 auto auto 0");
-    expect(popup.style.margin).toBe("0px");
-    expect(popup.style.transform).toBe(transform);
-    expect(popup.dataset.side).toBe(side);
+      expect(popup.dataset.side).toBe(side);
+      expect(popup.style.getPropertyValue("--side-offset")).toBe("5px");
+      // Placement lives in the imported stylesheet; JS writes no geometry.
+      expect(popup.style.transform).toBe("");
+      expect(popup.style.position).toBe("");
+      for (const edge of ["top", "right", "bottom", "left"] as const) {
+        expect(popup.style[edge]).toBe("");
+      }
+      for (const edge of ["Top", "Right", "Bottom", "Left"] as const) {
+        expect(popup.style[`margin${edge}` as const]).toBe("");
+      }
+      expect(triggerRect).not.toHaveBeenCalled();
+      expect(popupRect).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reflects side and offset changes without geometry reads", async () => {
+    const { popup, root, trigger } = createPopover({ defaultOpen: true });
+    const rect = vi.spyOn(trigger, "getBoundingClientRect");
+    document.body.append(root);
+    expect(popup.dataset.side).toBe("bottom");
+
+    root.side = "left";
+    root.sideOffset = 12;
+    await Promise.resolve();
+    expect(popup.dataset.side).toBe("left");
+    expect(popup.style.getPropertyValue("--side-offset")).toBe("12px");
+    expect(rect).not.toHaveBeenCalled();
   });
 
-  it("repositions on resize and capture-scroll, then cleans listeners on disconnect", () => {
+  it("stays attached without resize or capture-scroll listeners", () => {
     const { root, trigger } = createPopover({ defaultOpen: true });
     const rect = vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
       bottom: 20,
@@ -164,16 +182,28 @@ describe("fixed positioning", () => {
       y: 10,
       toJSON: () => ({}),
     });
+    const add = vi.spyOn(window, "addEventListener");
     document.body.append(root);
-    const baseline = rect.mock.calls.length;
+    expect(add.mock.calls.filter(([type]) => type === "resize" || type === "scroll")).toEqual([]);
 
     window.dispatchEvent(new Event("resize"));
     document.dispatchEvent(new Event("scroll"));
-    expect(rect.mock.calls.length).toBe(baseline + 2);
+    expect(rect).not.toHaveBeenCalled();
     root.remove();
     window.dispatchEvent(new Event("resize"));
     document.dispatchEvent(new Event("scroll"));
-    expect(rect.mock.calls.length).toBe(baseline + 2);
+    expect(rect).not.toHaveBeenCalled();
+  });
+
+  it("installs the anchor stylesheet once per document", () => {
+    const first = createPopover();
+    const second = createPopover();
+    document.body.append(first.root, second.root);
+
+    // Vitest stubs `?inline` CSS to an empty string, so this guards the
+    // install mechanism only; content ships via the build (see dist output).
+    expect(document.getElementById("bwc-popover-style")?.localName).toBe("style");
+    expect(document.querySelectorAll("#bwc-popover-style")).toHaveLength(1);
   });
 });
 

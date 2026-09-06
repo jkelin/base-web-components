@@ -12,16 +12,20 @@
     "./src/accordion/index.ts",
     "./src/modal/index.ts",
     "./src/popover/index.ts",
+    "./src/popover/popover.css",
     "./src/switch/index.ts",
     "./src/otp/index.ts",
     "./src/tabs/index.ts",
+    "./src/slide-out/index.ts",
+    "./src/slide-out/slide-out.css",
     "./dist/counter.js",
     "./dist/accordion.js",
     "./dist/modal.js",
     "./dist/popover.js",
     "./dist/switch.js",
     "./dist/otp.js",
-    "./dist/tabs.js"
+    "./dist/tabs.js",
+    "./dist/slide-out.js"
   ],
   "exports": {
     "./counter": {
@@ -72,6 +76,13 @@
       "development": "./src/tabs/index.ts",
       "import": "./dist/tabs.js",
       "default": "./dist/tabs.js"
+    },
+    "./slide-out": {
+      "types": "./src/slide-out/index.ts",
+      "source": "./src/slide-out/index.ts",
+      "development": "./src/slide-out/index.ts",
+      "import": "./dist/slide-out.js",
+      "default": "./dist/slide-out.js"
     }
   },
   "scripts": {

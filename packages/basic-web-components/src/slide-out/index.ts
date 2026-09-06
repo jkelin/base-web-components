@@ -1,4 +1,4 @@
-import popoverCSS from "./popover.css?inline";
+import slideOutCSS from "./slide-out.css?inline";
 import { defineComponent, effect, html, onMount, signal, useHost, useProp } from "microfw";
 import {
   booleanProp,
@@ -9,7 +9,6 @@ import {
   emit,
   enumProp,
   nextId,
-  numberProp,
   observeSlotSubtree,
   requireSlottedElement,
   setAttributeValue,
@@ -18,48 +17,49 @@ import {
   type ChangeCallback,
 } from "../shared";
 
-if (typeof document !== "undefined" && !document.getElementById("bwc-popover-style")) {
+if (typeof document !== "undefined" && !document.getElementById("bwc-slide-out-style")) {
   const style = document.createElement("style");
-  style.id = "bwc-popover-style";
-  style.textContent = popoverCSS;
+  style.id = "bwc-slide-out-style";
+  style.textContent = slideOutCSS;
   document.head.append(style);
 }
 
-export const BWC_POPOVER_TAG = "bwc-popover";
+export const BWC_SLIDE_OUT_TAG = "bwc-slide-out";
 
-const sides = ["top", "right", "bottom", "left"] as const;
+const sides = ["left", "right"] as const;
 type Side = (typeof sides)[number];
 
-export type BwcPopoverElement = HTMLElement & {
+export type BwcSlideOutElement = HTMLElement & {
   open: boolean;
   defaultOpen: boolean;
   disabled: boolean;
   side: Side;
-  sideOffset: number;
   triggerClass: string;
-  popupClass: string;
+  panelClass: string;
   closeClass: string;
   onOpenChange: ChangeCallback<boolean>;
 };
 
-export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_TAG, () => {
-  const host = useHost<BwcPopoverElement>();
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export const BwcSlideOutElement = defineComponent<BwcSlideOutElement>(BWC_SLIDE_OUT_TAG, () => {
+  const host = useHost<BwcSlideOutElement>();
   let controlled = host.hasAttribute("open") || Object.hasOwn(host, "open");
   const openState = signal(false);
   const parts = signal<{
     closeButtons: HTMLButtonElement[];
-    popup: HTMLDivElement;
+    panel: HTMLElement;
     trigger: HTMLButtonElement;
   } | null>(null);
   const topologyRevision = signal(0);
   const classRevision = signal(0);
-  const nativeRevision = signal(0);
   let topologyVersion = 0;
   let classVersion = 0;
-  let nativeVersion = 0;
   let initialized = false;
-  let activePopup: HTMLDivElement | null = null;
-  const shownPopups = new WeakSet<HTMLDivElement>();
+  let wasOpen = false;
+  let restoreFocus: HTMLElement | null = null;
+  let addedPanelTabindex = false;
   const classControllers = new WeakMap<HTMLElement, (partClass?: string | null) => void>();
 
   const open = useProp<boolean>("open", {
@@ -72,10 +72,9 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
   });
   const defaultOpen = useProp<boolean>("defaultOpen", booleanProp("default-open"));
   const disabled = useProp<boolean>("disabled", booleanProp("disabled"));
-  const side = useProp<Side>("side", enumProp("side", sides, "bottom"));
-  const sideOffset = useProp<number>("sideOffset", numberProp("side-offset"));
+  const side = useProp<Side>("side", enumProp("side", sides, "right"));
   const triggerClass = useProp<string>("triggerClass", stringProp("trigger-class"));
-  const popupClass = useProp<string>("popupClass", stringProp("popup-class"));
+  const panelClass = useProp<string>("panelClass", stringProp("panel-class"));
   const closeClass = useProp<string>("closeClass", stringProp("close-class"));
   const onOpenChange = useProp<ChangeCallback<boolean>>(
     "onOpenChange",
@@ -92,17 +91,33 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
     apply(value);
   };
 
-  const isShown = (popup: HTMLDivElement) =>
-    shownPopups.has(popup) || popup.matches(":popover-open");
+  // The dismiss overlay lives in shadow DOM so it paints below the slotted
+  // panel with no author markup; the panel itself stays light DOM for
+  // Tailwind/author styling via slide-out.css.
+  const overlay = () => host.shadowRoot?.querySelector<HTMLElement>("[data-overlay]") ?? null;
 
-  const hide = (popup: HTMLDivElement) => {
-    if (typeof popup.hidePopover === "function") {
-      if (isShown(popup)) popup.hidePopover();
-      popup.hidden = false;
-    } else {
-      popup.hidden = true;
+  const focusPanel = (panel: HTMLElement) => {
+    restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const target = panel.querySelector<HTMLElement>(FOCUSABLE);
+    if (target) {
+      target.focus();
+      return;
     }
-    shownPopups.delete(popup);
+    if (!panel.hasAttribute("tabindex")) {
+      panel.setAttribute("tabindex", "-1");
+      addedPanelTabindex = true;
+    }
+    panel.focus();
+  };
+
+  const restoreTriggerFocus = (trigger: HTMLButtonElement) => {
+    const panel = parts()?.panel;
+    if (panel && addedPanelTabindex) {
+      panel.removeAttribute("tabindex");
+      addedPanelTabindex = false;
+    }
+    (restoreFocus ?? trigger).focus();
+    restoreFocus = null;
   };
 
   const requestOpen = (next: boolean) => {
@@ -125,6 +140,8 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
     let stopClasses: (() => void) | undefined;
     let stopState: (() => void) | undefined;
     let stopConfig: (() => void) | undefined;
+    const overlayNode = overlay();
+    const onOverlayClick = () => requestOpen(false);
     const click = (event: MouseEvent) => {
       const target = event.target;
       const currentParts = parts();
@@ -136,30 +153,16 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
       const close = target.closest<HTMLButtonElement>("button[data-close]");
       if (close && currentParts.closeButtons.includes(close)) requestOpen(false);
     };
-    const toggle = (event: Event) => {
-      const currentParts = parts();
-      const nextState = (event as ToggleEvent).newState;
-      if (
-        !currentParts ||
-        event.target !== currentParts.popup ||
-        nextState !== "closed" ||
-        !openState()
-      ) {
-        return;
-      }
-      shownPopups.delete(currentParts.popup);
-      emit(host, onOpenChange(), "open-change", "open", false);
-      if (controlled) {
-        queueMicrotask(() => {
-          if (host.isConnected && openState()) nativeRevision(++nativeVersion);
-        });
-      } else {
-        openState(false);
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && openState()) {
+        event.preventDefault();
+        requestOpen(false);
       }
     };
     const cleanup = () => {
       host.removeEventListener("click", click);
-      host.removeEventListener("toggle", toggle, true);
+      document.removeEventListener("keydown", keydown);
+      overlayNode?.removeEventListener("click", onOverlayClick);
       stopObserver?.();
       stopConfig?.();
       stopState?.();
@@ -167,8 +170,6 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
       stopControl?.();
       stopTopology?.();
       parts(null);
-      if (activePopup) hide(activePopup);
-      activePopup = null;
     };
 
     try {
@@ -194,26 +195,23 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
       stopTopology = effect(() => {
         topologyRevision();
         parts(null);
-        if (activePopup) hide(activePopup);
-        activePopup = null;
 
-        const popup = requireSlottedElement(host, "popup", HTMLDivElement);
+        const panel = requireSlottedElement(host, "panel", HTMLElement);
         const trigger = requireSlottedElement(host, "trigger", HTMLButtonElement);
         const closeButtons = [
-          ...popup.querySelectorAll<HTMLButtonElement>("button[data-close]"),
+          ...panel.querySelectorAll<HTMLButtonElement>("button[data-close]"),
         ].filter((button) => belongsToHost(button, host));
-        activePopup = popup;
-        popup.id ||= nextId("bwc-popover-popup");
-        popup.dataset.testid ||= "bwc-popover-popup";
-        setAttributeValue(popup, "popover", "auto");
-        setAttributeValue(popup, "role", "dialog");
-        trigger.id ||= nextId("bwc-popover-trigger");
+        panel.id ||= nextId("bwc-slide-out-panel");
+        panel.dataset.testid ||= "bwc-slide-out-panel";
+        setAttributeValue(panel, "role", "dialog");
+        setAttributeValue(panel, "aria-modal", "false");
+        trigger.id ||= nextId("bwc-slide-out-trigger");
         setAttributeValue(trigger, "aria-haspopup", "dialog");
-        setAttributeValue(trigger, "aria-controls", popup.id);
+        setAttributeValue(trigger, "aria-controls", panel.id);
         for (const button of closeButtons) {
-          button.id ||= nextId("bwc-popover-close");
+          button.id ||= nextId("bwc-slide-out-close");
         }
-        parts({ closeButtons, popup, trigger });
+        parts({ closeButtons, panel, trigger });
       });
       stopControl = effect(() => {
         const next = open();
@@ -233,65 +231,50 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
         if (!currentParts) return;
         decorateButton(
           currentParts.trigger,
-          "popover-trigger",
-          "bwc-popover-trigger",
+          "slide-out-trigger",
+          "bwc-slide-out-trigger",
           currentParts.trigger.className,
         );
-        applyPartClass(currentParts.trigger, "popover-trigger", triggerClass());
-        applyPartClass(currentParts.popup, "popover-popup", popupClass());
+        applyPartClass(currentParts.trigger, "slide-out-trigger", triggerClass());
+        applyPartClass(currentParts.panel, "slide-out-panel", panelClass());
         for (const button of currentParts.closeButtons) {
-          decorateButton(button, "popover-close", "bwc-popover-close", button.className);
-          applyPartClass(button, "popover-close", closeClass());
+          decorateButton(button, "slide-out-close", "bwc-slide-out-close", button.className);
+          applyPartClass(button, "slide-out-close", closeClass());
         }
       });
       stopState = effect(() => {
-        nativeRevision();
         const currentParts = parts();
         if (!currentParts) return;
         const isOpen = openState();
         const isDisabled = disabled();
-        const { popup, trigger } = currentParts;
+        const { panel, trigger } = currentParts;
         if (trigger.disabled !== isDisabled) trigger.disabled = isDisabled;
         const cursor = isDisabled ? "not-allowed" : "pointer";
         if (trigger.style.cursor !== cursor) trigger.style.cursor = cursor;
         setAttributeValue(trigger, "aria-expanded", String(isOpen));
-        for (const node of [trigger, popup]) {
+        for (const node of [trigger, panel]) {
           toggleState(node, "data-open", isOpen);
           toggleState(node, "data-closed", !isOpen);
           toggleState(node, "data-disabled", isDisabled);
         }
 
-        if (isOpen && !isShown(popup)) {
-          try {
-            if (typeof popup.showPopover === "function") {
-              if (popup.hidden) popup.hidden = false;
-              popup.showPopover({ source: trigger });
-            } else {
-              if (popup.hidden) popup.hidden = false;
-            }
-            shownPopups.add(popup);
-          } catch (error) {
-            openState(false);
-            if (typeof popup.showPopover !== "function") popup.hidden = true;
-            throw error;
-          }
-        } else if (!isOpen) {
-          hide(popup);
-        }
+        const veil = overlay();
+        if (veil) veil.hidden = !isOpen;
+        if (isOpen && !wasOpen) focusPanel(panel);
+        else if (!isOpen && wasOpen) restoreTriggerFocus(trigger);
+        wasOpen = isOpen;
       });
       stopConfig = effect(() => {
         const currentParts = parts();
         if (!currentParts) return;
-        const { popup } = currentParts;
         const currentSide = side();
-        if (popup.dataset.side !== currentSide) popup.dataset.side = currentSide;
-        const offset = `${sideOffset()}px`;
-        if (popup.style.getPropertyValue("--side-offset") !== offset) {
-          popup.style.setProperty("--side-offset", offset);
+        if (currentParts.panel.dataset.side !== currentSide) {
+          currentParts.panel.dataset.side = currentSide;
         }
       });
       host.addEventListener("click", click);
-      host.addEventListener("toggle", toggle, true);
+      document.addEventListener("keydown", keydown);
+      overlayNode?.addEventListener("click", onOverlayClick);
       return cleanup;
     } catch (error) {
       cleanup();
@@ -299,5 +282,13 @@ export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_
     }
   });
 
-  return html`<slot name="trigger"></slot><slot name="popup"></slot>`;
+  // Shadow overlay first so the slotted panel paints above it; hidden until
+  // the state effect opens (also hides the pre-upgrade flash via CSS).
+  return html`<div
+      data-overlay
+      data-testid="bwc-slide-out-overlay"
+      hidden
+      style="position:fixed;inset:0;z-index:40;background:rgb(0 0 0 / 0.4);cursor:pointer"
+    ></div>
+    <slot name="trigger"></slot><slot name="panel"></slot>`;
 });

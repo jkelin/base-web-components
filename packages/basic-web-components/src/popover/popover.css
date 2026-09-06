@@ -1,0 +1,44 @@
+/*
+ * Positioning for bwc-popover popups using CSS Anchor Positioning.
+ *
+ * The popup anchors to its trigger implicitly: the component opens the popup
+ * with `showPopover({ source: trigger })`, so `position-area` resolves against
+ * the trigger with no explicit `anchor-name` and no per-instance JS wiring.
+ * JavaScript only writes the requested side (`data-side`) and the gap
+ * (`--side-offset`); placement, scroll tracking, and viewport-edge flipping
+ * are handled by the browser.
+ *
+ * Minimum versions: Chrome/Edge 133+, Firefox 147+, Safari 26+. Older
+ * browsers ignore `position-area` / `position-try-fallbacks` and render the
+ * popup at its static origin (fail open); placement is not polyfilled.
+ */
+
+bwc-popover > [slot="popup"] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+}
+
+bwc-popover > [slot="popup"][data-side="bottom"] {
+  position-area: bottom span-right;
+  position-try-fallbacks: flip-block;
+  margin-top: var(--side-offset, 0px);
+}
+
+bwc-popover > [slot="popup"][data-side="top"] {
+  position-area: top span-right;
+  position-try-fallbacks: flip-block;
+  margin-bottom: var(--side-offset, 0px);
+}
+
+bwc-popover > [slot="popup"][data-side="right"] {
+  position-area: right span-bottom;
+  position-try-fallbacks: flip-inline;
+  margin-left: var(--side-offset, 0px);
+}
+
+bwc-popover > [slot="popup"][data-side="left"] {
+  position-area: left span-bottom;
+  position-try-fallbacks: flip-inline;
+  margin-right: var(--side-offset, 0px);
+}

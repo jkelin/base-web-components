@@ -15,7 +15,7 @@ No CDN in the repo: smoke CSS is local.
 ## Library layout
 
 - One folder per component under `src/`: `counter/`, `accordion/`, `modal/`,
-  `popover/`, `switch/`, `otp/`, `tabs/`. Shared code lives
+  `popover/`, `slide-out/`, `switch/`, `otp/`, `tabs/`. Shared code lives
   only in `src/shared/index.ts`; never cross-import between component folders.
 - Each folder owns colocated behavioral tests (`*.test.ts` next to the source).
   Tests assert observable behavior (rendered state, events, ARIA), never wiring.
@@ -29,7 +29,7 @@ No CDN in the repo: smoke CSS is local.
   effects, listeners, and observers are disposed on unmount and re-created
   on remount. `onclick`-style author handlers are never clobbered.
 - Part-class props (`button-class`, `thumb-class`, `input-class`;
-  `trigger-class`, `popup-class`, `close-class`; `field-class`,
+  `trigger-class`, `popup-class`, `panel-class`, `close-class`; `field-class`,
   `hidden-input-class`) carry plain space-separated Tailwind strings merged
   after the stable marker class by part controllers. `bwc-switch` generates
   its `button slot="control"` (with thumb `span` and hidden `input`; never
@@ -47,7 +47,9 @@ No CDN in the repo: smoke CSS is local.
   `output slot="value"`, `button slot="increment"`; accordion takes
   `details slot="item" data-value="<id>"` holding a `<summary>` title plus a
   panel `<div>`; modal/popover take `slot="trigger"` buttons, a `slot="popup"`
-  `dialog`/`div`, and an inner `<button data-close>`; tabs takes a
+  `dialog`/`div`, and an inner `<button data-close>`; slide-out takes a
+  `slot="trigger"` button, a `slot="panel"` element, and an inner
+  `<button data-close>`; tabs takes a
   `div slot="list"` of `<button value="<id>">` plus
   `section slot="panel" data-value="<id>"`. `bwc-switch` and `bwc-otp` take
   no author children — their parts are generated (see above).
@@ -55,10 +57,23 @@ No CDN in the repo: smoke CSS is local.
   the correct cursor (`pointer` for click targets, `text` for inputs,
   `not-allowed` when disabled). Author classes/ids survive upgrades.
 
+## Documentation
+
+- Each component folder owns a colocated `README.md` (intro, usage examples,
+  full API). Whenever adding, changing, or removing component props/events/
+  slots/parts, behavior, form participation, or errors, MUST update that
+  folder's `README.md` in the same change.
+- README examples MUST use native slot markup exactly as implemented (never
+  invent slot names) and MUST be validated against the colocated
+  `*.test.ts` before finishing.
+- README and website demo examples MUST NOT include `aria-*` attributes —
+  components own ARIA at runtime (roles, labels, states); examples show only
+  author markup, ids, `data-testid`, and styling hooks.
+
 ## Output contract
 
-- Seven entries, no aggregate root runtime: `counter`, `accordion`, `modal`,
-  `popover`, `switch`, `otp`, `tabs` → `dist/<name>.js`
+- Eight entries, no aggregate root runtime: `counter`, `accordion`, `modal`,
+  `popover`, `slide-out`, `switch`, `otp`, `tabs` → `dist/<name>.js`
   (native-minified ES modules, ES2022) plus one `shared.js` chunk carrying
   shared helpers and the single microfw/alien runtime copy.
   `sideEffects` preserves self-registration.

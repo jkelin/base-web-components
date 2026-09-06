@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "smoke"
+    "smoke",
+    "website"
   ],
   "scripts": {
     "build": "bun run --filter '*' build",
@@ -11,6 +12,7 @@
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
     "dev": "bun run --filter smoke dev",
+    "web": "bun run --filter website dev",
     "lint": "bun run --parallel --filter '*' lint",
     "format": "bun run --parallel --filter '*' format",
     "prepare": "husky"

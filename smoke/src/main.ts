@@ -250,25 +250,25 @@ async function exerciseSuites() {
   if (!popoverPopup.hasAttribute("data-open")) {
     throw new Error("popover popup did not report open state");
   }
-  if (popoverPopup.style.position !== "fixed") {
+  if (getComputedStyle(popoverPopup).position !== "fixed") {
     throw new Error("popover popup is not fixed-positioned");
   }
-  if (popoverPopup.style.inset !== "0px auto auto 0px") {
-    throw new Error("popover popup lacks the static zero-origin inset");
+  if (popoverPopup.dataset.side !== "bottom") {
+    throw new Error("popover popup does not report the requested side");
   }
-  if (popoverPopup.style.margin !== "0px") {
-    throw new Error("popover popup margin is not zero");
+  if (popoverPopup.style.getPropertyValue("--side-offset") === "") {
+    throw new Error("popover popup lacks the side-offset property");
   }
   for (const [edge, value] of [
     ["top", popoverPopup.style.top],
     ["left", popoverPopup.style.left],
   ] as const) {
     if (value !== "" && value !== "0px") {
-      throw new Error(`popover popup uses dynamic ${edge} instead of transform`);
+      throw new Error(`popover popup uses dynamic ${edge} instead of anchor positioning`);
     }
   }
-  if (!popoverPopup.style.transform.includes("translate3d")) {
-    throw new Error("popover popup is not transform-positioned");
+  if (popoverPopup.style.transform !== "") {
+    throw new Error("popover popup is not anchor-positioned");
   }
   popoverClose.click();
   await waitFor(() => popoverTrigger.getAttribute("aria-expanded"), "false", "popover close");

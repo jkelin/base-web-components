@@ -9,6 +9,7 @@ const entries = {
   switch: "src/switch/index.ts",
   otp: "src/otp/index.ts",
   tabs: "src/tabs/index.ts",
+  "slide-out": "src/slide-out/index.ts",
 };
 
 export default defineConfig({
