@@ -42,29 +42,31 @@ describe("native slot lookup", () => {
 });
 
 describe("slot subtree observation", () => {
-  it("syncs initially, reacts to slot/subtree changes, and disposes", async () => {
+  it("syncs initially, reports author records, reacts to slot changes, and disposes", async () => {
     const host = document.createElement("div");
     host.attachShadow({ mode: "open" }).innerHTML = `<slot name="item"></slot>`;
-    const sync = vi.fn();
-    const dispose = observeSlotSubtree(host, sync, ["value"]);
-    expect(sync).toHaveBeenCalledOnce();
+    const batches: Array<readonly MutationRecord[]> = [];
+    const dispose = observeSlotSubtree(host, (records) => batches.push(records), ["value"]);
+    expect(batches).toEqual([[]]);
 
     const item = document.createElement("div");
     item.slot = "item";
     host.append(item);
     await Promise.resolve();
     await Promise.resolve();
-    expect(sync).toHaveBeenCalledTimes(2);
+    expect(batches).toHaveLength(2);
+    expect(batches[1]?.some((record) => record.type === "childList")).toBe(true);
 
     item.setAttribute("value", "changed");
     await Promise.resolve();
     await Promise.resolve();
-    expect(sync).toHaveBeenCalledTimes(3);
+    expect(batches).toHaveLength(3);
+    expect(batches[2]?.map((record) => record.attributeName)).toEqual(["value"]);
 
     dispose();
     item.setAttribute("value", "ignored");
     await Promise.resolve();
-    expect(sync).toHaveBeenCalledTimes(3);
+    expect(batches).toHaveLength(3);
   });
 
   it("ignores mutations caused by sync while retaining later author changes", async () => {

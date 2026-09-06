@@ -7,6 +7,8 @@ import {
   observeSlotSubtree,
   parseJsonStrings,
   slottedElements,
+  setAttributeValue,
+  toggleState,
 } from "../shared";
 
 export const BWC_ACCORDION_TAG = "bwc-accordion";
@@ -59,6 +61,11 @@ function defineAccordion(): { new (): AccordionApi } {
     const assignedValue = Object.hasOwn(host, "value");
     const controlled = signal(host.hasAttribute("value") || assignedValue);
     const currentValue = signal<string[]>([]);
+    const parts = signal<AccordionItem[] | null>(null);
+    const topologyRevision = signal(0);
+    const disabledRevision = signal(0);
+    let topologyVersion = 0;
+    let disabledVersion = 0;
     let initialized = false;
     const setCurrentValue = (next: string[]) => {
       const previous = currentValue();
@@ -105,54 +112,18 @@ function defineAccordion(): { new (): AccordionApi } {
       "onValueChange",
       callbackProp<string[]>("onValueChange"),
     );
-    const sync = () => {
-      const items = accordionItems(host);
-      if (!initialized) {
-        initialized = true;
-        setCurrentValue(controlled() ? value() : defaultValue());
-      } else if (controlled()) {
-        setCurrentValue(value());
-      }
-
-      const selected = currentValue();
-      if (!multiple() && selected.length > 1) {
-        throw new TypeError("single accordion accepts at most one value");
-      }
-      const rootDisabled = disabled();
-      host.toggleAttribute("data-disabled", rootDisabled);
-
-      for (const item of items) {
-        const open = selected.includes(item.value);
-        const itemDisabled = rootDisabled || item.details.hasAttribute("disabled");
-        if (item.details.open !== open) item.details.open = open;
-        item.summary.id ||= nextId("bwc-accordion-summary");
-        item.panel.id ||= nextId("bwc-accordion-panel");
-        item.summary.classList.add("accordion-trigger");
-        item.summary.dataset.testid ||= `bwc-accordion-summary-${item.value}`;
-        item.summary.setAttribute("aria-controls", item.panel.id);
-        item.summary.setAttribute("aria-disabled", String(itemDisabled));
-        item.summary.style.cursor = itemDisabled ? "not-allowed" : "pointer";
-        item.panel.setAttribute("role", "region");
-        item.panel.setAttribute("aria-labelledby", item.summary.id);
-
-        for (const node of [item.details, item.summary, item.panel]) {
-          node.toggleAttribute("data-open", open);
-          node.toggleAttribute("data-closed", !open);
-          node.toggleAttribute("data-disabled", itemDisabled);
-        }
-      }
-    };
 
     const toggle = (event: Event) => {
       const details = event.target;
-      if (!(details instanceof HTMLDetailsElement)) return;
-      const item = accordionItems(host).find((candidate) => candidate.details === details);
+      const currentParts = parts();
+      if (!(details instanceof HTMLDetailsElement) || !currentParts) return;
+      const item = currentParts.find((candidate) => candidate.details === details);
       if (!item) return;
 
       const selected = currentValue();
       const alreadySynchronized = details.open === selected.includes(item.value);
       if (disabled() || details.hasAttribute("disabled") || alreadySynchronized) {
-        sync();
+        details.open = selected.includes(item.value);
         return;
       }
       const next = details.open
@@ -162,29 +133,100 @@ function defineAccordion(): { new (): AccordionApi } {
         : selected.filter((entry) => entry !== item.value);
 
       emit(host, onValueChange(), "value-change", "value", [...next]);
-      if (!controlled()) currentValue(next);
-      sync();
+      if (!controlled()) setCurrentValue(next);
+      else details.open = selected.includes(item.value);
     };
 
     onMount(() => {
-      sync();
-      const stopEffect = effect(sync);
-      let stopObserving: (() => void) | undefined;
-      try {
-        stopObserving = observeSlotSubtree(host, sync, ["data-value", "disabled", "slot"]);
-        host.addEventListener("toggle", toggle, true);
-      } catch (error) {
-        stopObserving?.();
-        stopEffect();
+      let stopObserver: (() => void) | undefined;
+      let stopTopology: (() => void) | undefined;
+      let stopControl: (() => void) | undefined;
+      let stopState: (() => void) | undefined;
+      const cleanup = () => {
         host.removeEventListener("toggle", toggle, true);
+        stopObserver?.();
+        stopState?.();
+        stopControl?.();
+        stopTopology?.();
+        parts(null);
+      };
+
+      try {
+        stopObserver = observeSlotSubtree(
+          host,
+          (records) => {
+            if (
+              records.length === 0 ||
+              records.some(
+                (record) =>
+                  record.type === "childList" ||
+                  record.attributeName === "slot" ||
+                  record.attributeName === "data-value",
+              )
+            ) {
+              topologyRevision(++topologyVersion);
+            } else {
+              disabledRevision(++disabledVersion);
+            }
+          },
+          ["data-value", "disabled", "slot"],
+        );
+        stopTopology = effect(() => {
+          topologyRevision();
+          parts(null);
+          const nextParts = accordionItems(host);
+          for (const item of nextParts) {
+            item.summary.id ||= nextId("bwc-accordion-summary");
+            item.panel.id ||= nextId("bwc-accordion-panel");
+            item.summary.classList.add("accordion-trigger");
+            item.summary.dataset.testid ||= `bwc-accordion-summary-${item.value}`;
+            setAttributeValue(item.summary, "aria-controls", item.panel.id);
+            setAttributeValue(item.panel, "role", "region");
+            setAttributeValue(item.panel, "aria-labelledby", item.summary.id);
+          }
+          parts(nextParts);
+        });
+        stopControl = effect(() => {
+          const isControlled = controlled();
+          const next = isControlled ? value() : defaultValue();
+          if (!initialized) {
+            initialized = true;
+            setCurrentValue(next);
+          } else if (isControlled) {
+            setCurrentValue(next);
+          }
+        });
+        stopState = effect(() => {
+          disabledRevision();
+          const currentParts = parts();
+          if (!currentParts) return;
+          const selected = currentValue();
+          if (!multiple() && selected.length > 1) {
+            throw new TypeError("single accordion accepts at most one value");
+          }
+          const rootDisabled = disabled();
+          toggleState(host, "data-disabled", rootDisabled);
+
+          for (const item of currentParts) {
+            const open = selected.includes(item.value);
+            const itemDisabled = rootDisabled || item.details.hasAttribute("disabled");
+            if (item.details.open !== open) item.details.open = open;
+            setAttributeValue(item.summary, "aria-disabled", String(itemDisabled));
+            const cursor = itemDisabled ? "not-allowed" : "pointer";
+            if (item.summary.style.cursor !== cursor) item.summary.style.cursor = cursor;
+            for (const node of [item.details, item.summary, item.panel]) {
+              toggleState(node, "data-open", open);
+              toggleState(node, "data-closed", !open);
+              toggleState(node, "data-disabled", itemDisabled);
+            }
+          }
+        });
+        host.addEventListener("toggle", toggle, true);
+        return cleanup;
+      } catch (error) {
+        cleanup();
         throw error;
       }
-
-      return () => {
-        host.removeEventListener("toggle", toggle, true);
-        stopObserving?.();
-        stopEffect();
-      };
     });
 
     return html`<slot name="item"></slot>`;

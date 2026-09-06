@@ -15,6 +15,7 @@ import {
   observeSlotSubtree,
   partClassName,
   requireSlottedElement,
+  setAttributeValue,
   type ChangeCallback,
 } from "../shared";
 
@@ -55,6 +56,15 @@ export const BwcCounterElement = defineComponent<CounterApi>(BWC_COUNTER_TAG, ()
     count: signal(0),
     initialized: false,
   };
+  const parts = signal<{
+    decrement: HTMLButtonElement;
+    increment: HTMLButtonElement;
+    output: HTMLOutputElement;
+  } | null>(null);
+  const topologyRevision = signal(0);
+  const decorationRevision = signal(0);
+  let topologyVersion = 0;
+  let decorationVersion = 0;
   const defaultValue = useProp("defaultValue", {
     ...counterValueCodec,
     attribute: "default-value",
@@ -77,78 +87,101 @@ export const BwcCounterElement = defineComponent<CounterApi>(BWC_COUNTER_TAG, ()
   }
 
   onMount(() => {
-    let decrement: HTMLButtonElement | undefined;
-    let increment: HTMLButtonElement | undefined;
-    let output: HTMLOutputElement | undefined;
+    let stopTopology: (() => void) | undefined;
+    let stopDecoration: (() => void) | undefined;
+    let stopContent: (() => void) | undefined;
+    let stopControl: (() => void) | undefined;
+    let stopObserver: (() => void) | undefined;
     const click = (event: MouseEvent) => {
+      const currentParts = parts();
+      if (!currentParts) return;
       const path = event.composedPath();
-      const delta =
-        decrement && path.includes(decrement) ? -1 : increment && path.includes(increment) ? 1 : 0;
+      const delta = path.includes(currentParts.decrement)
+        ? -1
+        : path.includes(currentParts.increment)
+          ? 1
+          : 0;
       if (delta === 0) return;
       const next = state.count() + delta;
       emit(host, onChange(), "change", "value", next);
       if (!state.controlled) state.count(next);
     };
-    const sync = () => {
-      decrement = undefined;
-      output = undefined;
-      increment = undefined;
-
-      const nextDecrement = requireSlottedElement(host, "decrement", HTMLButtonElement);
-      const nextOutput = requireSlottedElement(host, "value", HTMLOutputElement);
-      const nextIncrement = requireSlottedElement(host, "increment", HTMLButtonElement);
-
-      decrement = nextDecrement;
-      output = nextOutput;
-      increment = nextIncrement;
-
-      nextDecrement.setAttribute("aria-label", "Decrement count");
-      decorateButton(
-        nextDecrement,
-        "counter-minus-button",
-        DECREMENT_TEST_ID,
-        nextDecrement.className,
-      );
-      nextOutput.setAttribute("aria-live", "polite");
-      nextOutput.dataset.testid ||= OUTPUT_TEST_ID;
-      nextOutput.className = partClassName("counter-label", nextOutput.className);
-      nextIncrement.setAttribute("aria-label", "Increment count");
-      decorateButton(
-        nextIncrement,
-        "counter-plus-button",
-        INCREMENT_TEST_ID,
-        nextIncrement.className,
-      );
-
-      const text = String(state.count());
-      if (nextOutput.textContent !== text) nextOutput.textContent = text;
-    };
-
-    const disposeObserver = observeSlotSubtree(host, sync, ["class", "disabled", "slot"]);
-    effect(() => {
-      const text = String(state.count());
-      if (output && output.textContent !== text) output.textContent = text;
-    });
-    effect(() => {
-      const next = value();
-      const hasValue = host.hasAttribute("value");
-      if (hasValue) {
-        state.controlled = true;
-        state.count(next);
-      } else if (state.initialized && state.controlled) {
-        state.controlled = false;
-        state.count(0);
-      } else if (!state.initialized && !state.controlled) {
-        state.count(defaultValue());
-      }
-      state.initialized = true;
-    });
-
-    host.addEventListener("click", click);
-    return () => {
+    const cleanup = () => {
       host.removeEventListener("click", click);
-      disposeObserver();
+      stopObserver?.();
+      stopControl?.();
+      stopContent?.();
+      stopDecoration?.();
+      stopTopology?.();
+      parts(null);
     };
+
+    try {
+      stopObserver = observeSlotSubtree(
+        host,
+        (records) => {
+          if (
+            records.length === 0 ||
+            records.some(
+              (record) =>
+                (record.type === "childList" && record.target === host) ||
+                record.attributeName === "slot",
+            )
+          ) {
+            topologyRevision(++topologyVersion);
+          } else {
+            decorationRevision(++decorationVersion);
+          }
+        },
+        ["class", "disabled", "slot"],
+      );
+      stopTopology = effect(() => {
+        topologyRevision();
+        parts(null);
+        const decrement = requireSlottedElement(host, "decrement", HTMLButtonElement);
+        const output = requireSlottedElement(host, "value", HTMLOutputElement);
+        const increment = requireSlottedElement(host, "increment", HTMLButtonElement);
+        parts({ decrement, increment, output });
+      });
+      stopDecoration = effect(() => {
+        decorationRevision();
+        const currentParts = parts();
+        if (!currentParts) return;
+        const { decrement, increment, output } = currentParts;
+        setAttributeValue(decrement, "aria-label", "Decrement count");
+        decorateButton(decrement, "counter-minus-button", DECREMENT_TEST_ID, decrement.className);
+        setAttributeValue(output, "aria-live", "polite");
+        output.dataset.testid ||= OUTPUT_TEST_ID;
+        const outputClass = partClassName("counter-label", output.className);
+        if (output.className !== outputClass) output.className = outputClass;
+        setAttributeValue(increment, "aria-label", "Increment count");
+        decorateButton(increment, "counter-plus-button", INCREMENT_TEST_ID, increment.className);
+      });
+      stopContent = effect(() => {
+        const output = parts()?.output;
+        const text = String(state.count());
+        if (output && output.textContent !== text) output.textContent = text;
+      });
+      stopControl = effect(() => {
+        const next = value();
+        const hasValue = host.hasAttribute("value");
+        if (hasValue) {
+          state.controlled = true;
+          state.count(next);
+        } else if (state.initialized && state.controlled) {
+          state.controlled = false;
+          state.count(0);
+        } else if (!state.initialized && !state.controlled) {
+          state.count(defaultValue());
+        }
+        state.initialized = true;
+      });
+      host.addEventListener("click", click);
+      return cleanup;
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
   });
 
   return html`<slot name="decrement"></slot><slot name="value"></slot

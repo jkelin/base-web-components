@@ -8,7 +8,9 @@ import {
   observeSlotSubtree,
   requireSlottedElement,
   slottedElements,
+  setAttributeValue,
   stringProp,
+  toggleState,
 } from "../shared";
 
 export const BWC_TABS_TAG = "bwc-tabs";
@@ -67,11 +69,26 @@ function tabsParts(host: HTMLElement): TabsParts {
 export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
   const host = useHost<TabsApi>();
   const assignedValue = Object.hasOwn(host, "value");
-  const controlled = signal(host.hasAttribute("value") || assignedValue);
-  const currentValue = signal("");
+  let controlledSnapshot = host.hasAttribute("value") || assignedValue;
+  let currentValueSnapshot = "";
+  const controlled = signal(controlledSnapshot);
+  const currentValue = signal(currentValueSnapshot);
+  const setControlled = (next: boolean) => {
+    controlledSnapshot = next;
+    controlled(next);
+  };
+  const setCurrentValue = (next: string) => {
+    currentValueSnapshot = next;
+    currentValue(next);
+  };
+  const parts = signal<TabsParts | null>(null);
+  const topologyRevision = signal(0);
+  const disabledRevision = signal(0);
   const itemDisabled = new WeakMap<HTMLButtonElement, boolean>();
   const appliedDisabled = new WeakMap<HTMLButtonElement, boolean>();
   const previousButtonValues = new WeakMap<HTMLButtonElement, string>();
+  let topologyVersion = 0;
+  let disabledVersion = 0;
   let initialized = false;
 
   const orientation = useProp<Orientation>(
@@ -88,17 +105,17 @@ export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
     ...stringProp("value"),
     defaultValue: "",
     fromAttribute: (raw) => {
-      controlled(raw !== null);
-      if (initialized && raw === null) currentValue("");
+      setControlled(raw !== null);
+      if (initialized && raw === null) setCurrentValue("");
       return raw ?? "";
     },
     toAttribute: (next) => (controlled() ? next : null),
     get: () => currentValue(),
     onSet: (next, commit) => {
       if (!next) throw new TypeError("value must be nonempty");
-      controlled(true);
+      setControlled(true);
       commit(next);
-      currentValue(next);
+      setCurrentValue(next);
     },
   });
   const onValueChange = useProp<ChangeCallback<string>>(
@@ -106,93 +123,23 @@ export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
     callbackProp<string>("onValueChange"),
   );
 
-  const sync = () => {
-    const parts = tabsParts(host);
-    if (!controlled()) {
-      for (const button of parts.buttons) {
-        const previousValue = previousButtonValues.get(button);
-        if (previousValue === currentValue() && previousValue !== button.value) {
-          currentValue(button.value);
-          break;
-        }
-      }
-    }
-
-    if (!initialized) {
-      initialized = true;
-      if (controlled()) currentValue(value());
-      else {
-        const preferred = defaultValue();
-        const initial = preferred
-          ? parts.buttons.find((button) => button.value === preferred && !button.disabled)
-          : parts.buttons.find((button) => !button.disabled);
-        currentValue(initial?.value ?? "");
-      }
-    } else if (controlled()) {
-      currentValue(value());
-    }
-
-    const rootDisabled = disabled();
-    const selected = currentValue();
-    host.toggleAttribute("data-disabled", rootDisabled);
-    parts.list.classList.add("tabs-list");
-    parts.list.dataset.testid ||= "bwc-tabs-list";
-    parts.list.setAttribute("role", "tablist");
-    parts.list.setAttribute("aria-orientation", orientation());
-
-    for (const button of parts.buttons) {
-      const previouslyApplied = appliedDisabled.get(button);
-      if (previouslyApplied === undefined || button.disabled !== previouslyApplied) {
-        itemDisabled.set(button, button.disabled);
-      }
-      const effectiveDisabled = rootDisabled || itemDisabled.get(button) === true;
-      const active = selected === button.value;
-      const panel = parts.panelByValue.get(button.value)!;
-      button.disabled = effectiveDisabled;
-      appliedDisabled.set(button, effectiveDisabled);
-      previousButtonValues.set(button, button.value);
-      button.id ||= nextId("bwc-tab");
-      panel.id ||= nextId("bwc-tab-panel");
-      button.classList.add("tab");
-      button.dataset.testid ||= `bwc-tab-${button.value}`;
-      button.type = "button";
-      button.style.cursor = effectiveDisabled ? "not-allowed" : "pointer";
-      button.setAttribute("role", "tab");
-      button.setAttribute("aria-selected", String(active));
-      button.setAttribute("aria-controls", panel.id);
-      button.tabIndex = active ? 0 : -1;
-      button.toggleAttribute("data-active", active);
-      button.toggleAttribute("data-inactive", !active);
-      button.toggleAttribute("data-disabled", effectiveDisabled);
-      panel.classList.add("tab-panel");
-      panel.dataset.testid ||= `bwc-tab-panel-${button.value}`;
-      panel.setAttribute("role", "tabpanel");
-      panel.setAttribute("aria-labelledby", button.id);
-      panel.hidden = !active;
-      panel.toggleAttribute("data-active", active);
-      panel.toggleAttribute("data-inactive", !active);
-      panel.toggleAttribute("data-disabled", effectiveDisabled);
-    }
-  };
-
   const buttonFromEvent = (event: Event): HTMLButtonElement | undefined => {
     const target = event.composedPath().find((entry) => entry instanceof HTMLButtonElement);
-    if (!(target instanceof HTMLButtonElement)) return undefined;
-    const { buttons } = tabsParts(host);
-    return buttons.includes(target) && target.closest(BWC_TABS_TAG) === host ? target : undefined;
+    const currentParts = parts();
+    if (!(target instanceof HTMLButtonElement) || !currentParts) return undefined;
+    return currentParts.buttons.includes(target) && target.closest(BWC_TABS_TAG) === host
+      ? target
+      : undefined;
   };
-
   const select = (button: HTMLButtonElement) => {
     if (disabled() || button.disabled) return;
     const next = button.value;
     if (!next || (!controlled() && next === currentValue())) return;
     emit(host, onValueChange(), "value-change", "value", next);
-    if (!controlled()) currentValue(next);
-    sync();
+    if (!controlled()) setCurrentValue(next);
   };
   let pointerDownButton: HTMLButtonElement | undefined;
   let pointerFocusSelection: HTMLButtonElement | undefined;
-
   const pointerdown = (event: PointerEvent) => {
     pointerDownButton = buttonFromEvent(event);
     pointerFocusSelection = undefined;
@@ -214,9 +161,9 @@ export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
   };
   const keydown = (event: KeyboardEvent) => {
     const button = buttonFromEvent(event);
-    if (!button) return;
-    const { buttons } = tabsParts(host);
-    const enabled = buttons.filter((candidate) => !candidate.disabled);
+    const currentParts = parts();
+    if (!button || !currentParts) return;
+    const enabled = currentParts.buttons.filter((candidate) => !candidate.disabled);
     const index = enabled.indexOf(button);
     if (index < 0 || enabled.length === 0) return;
     const previousKey = orientation() === "horizontal" ? "ArrowLeft" : "ArrowUp";
@@ -236,35 +183,152 @@ export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
   };
 
   onMount(() => {
-    sync();
-    const stopEffect = effect(sync);
-    let stopObserving: (() => void) | undefined;
-    try {
-      stopObserving = observeSlotSubtree(host, sync, ["slot", "value", "data-value", "disabled"]);
-      host.addEventListener("pointerdown", pointerdown);
-      host.addEventListener("click", click);
-      host.addEventListener("focusin", focus);
-      host.addEventListener("keydown", keydown);
-    } catch (error) {
-      stopObserving?.();
-      stopEffect();
-      host.removeEventListener("pointerdown", pointerdown);
-      host.removeEventListener("click", click);
-      host.removeEventListener("focusin", focus);
-      host.removeEventListener("keydown", keydown);
-      throw error;
-    }
-
-    return () => {
+    let stopObserver: (() => void) | undefined;
+    let stopTopology: (() => void) | undefined;
+    let stopControl: (() => void) | undefined;
+    let stopOrientation: (() => void) | undefined;
+    let stopState: (() => void) | undefined;
+    const cleanup = () => {
       pointerDownButton = undefined;
       pointerFocusSelection = undefined;
       host.removeEventListener("pointerdown", pointerdown);
       host.removeEventListener("click", click);
       host.removeEventListener("focusin", focus);
       host.removeEventListener("keydown", keydown);
-      stopObserving?.();
-      stopEffect();
+      stopObserver?.();
+      stopState?.();
+      stopOrientation?.();
+      stopControl?.();
+      stopTopology?.();
+      parts(null);
     };
+
+    try {
+      stopObserver = observeSlotSubtree(
+        host,
+        (records) => {
+          const currentParts = parts();
+          if (
+            records.length === 0 ||
+            records.some(
+              (record) =>
+                (record.type === "childList" &&
+                  (record.target === host || record.target === currentParts?.list)) ||
+                (record.target !== host &&
+                  (record.attributeName === "slot" ||
+                    record.attributeName === "value" ||
+                    record.attributeName === "data-value")),
+            )
+          ) {
+            topologyRevision(++topologyVersion);
+          } else {
+            disabledRevision(++disabledVersion);
+          }
+        },
+        ["slot", "value", "data-value", "disabled"],
+      );
+      stopTopology = effect(() => {
+        topologyRevision();
+        parts(null);
+        const nextParts = tabsParts(host);
+        if (!controlledSnapshot) {
+          for (const button of nextParts.buttons) {
+            const previousValue = previousButtonValues.get(button);
+            if (previousValue === currentValueSnapshot && previousValue !== button.value) {
+              setCurrentValue(button.value);
+              break;
+            }
+          }
+        }
+
+        nextParts.list.classList.add("tabs-list");
+        nextParts.list.dataset.testid ||= "bwc-tabs-list";
+        setAttributeValue(nextParts.list, "role", "tablist");
+        for (const button of nextParts.buttons) {
+          const previouslyApplied = appliedDisabled.get(button);
+          if (previouslyApplied === undefined || button.disabled !== previouslyApplied) {
+            itemDisabled.set(button, button.disabled);
+          }
+          previousButtonValues.set(button, button.value);
+          const panel = nextParts.panelByValue.get(button.value)!;
+          button.id ||= nextId("bwc-tab");
+          panel.id ||= nextId("bwc-tab-panel");
+          button.classList.add("tab");
+          button.dataset.testid ||= `bwc-tab-${button.value}`;
+          button.type = "button";
+          setAttributeValue(button, "role", "tab");
+          setAttributeValue(button, "aria-controls", panel.id);
+          panel.classList.add("tab-panel");
+          panel.dataset.testid ||= `bwc-tab-panel-${button.value}`;
+          setAttributeValue(panel, "role", "tabpanel");
+          setAttributeValue(panel, "aria-labelledby", button.id);
+        }
+        parts(nextParts);
+      });
+      stopControl = effect(() => {
+        const currentParts = parts();
+        if (!currentParts) return;
+        const isControlled = controlled();
+        if (!initialized) {
+          initialized = true;
+          if (isControlled) {
+            setCurrentValue(value());
+          } else {
+            const preferred = defaultValue();
+            const initial = preferred
+              ? currentParts.buttons.find(
+                  (button) => button.value === preferred && !button.disabled,
+                )
+              : currentParts.buttons.find((button) => !button.disabled);
+            setCurrentValue(initial?.value ?? "");
+          }
+        } else if (isControlled) {
+          setCurrentValue(value());
+        }
+      });
+      stopOrientation = effect(() => {
+        const list = parts()?.list;
+        if (list) setAttributeValue(list, "aria-orientation", orientation());
+      });
+      stopState = effect(() => {
+        disabledRevision();
+        const currentParts = parts();
+        if (!currentParts) return;
+        const rootDisabled = disabled();
+        const selected = currentValue();
+        toggleState(host, "data-disabled", rootDisabled);
+        for (const button of currentParts.buttons) {
+          const previouslyApplied = appliedDisabled.get(button);
+          if (previouslyApplied === undefined || button.disabled !== previouslyApplied) {
+            itemDisabled.set(button, button.disabled);
+          }
+          const effectiveDisabled = rootDisabled || itemDisabled.get(button) === true;
+          const active = selected === button.value;
+          const panel = currentParts.panelByValue.get(button.value)!;
+          if (button.disabled !== effectiveDisabled) button.disabled = effectiveDisabled;
+          appliedDisabled.set(button, effectiveDisabled);
+          const cursor = effectiveDisabled ? "not-allowed" : "pointer";
+          if (button.style.cursor !== cursor) button.style.cursor = cursor;
+          setAttributeValue(button, "aria-selected", String(active));
+          if (button.tabIndex !== (active ? 0 : -1)) button.tabIndex = active ? 0 : -1;
+          toggleState(button, "data-active", active);
+          toggleState(button, "data-inactive", !active);
+          toggleState(button, "data-disabled", effectiveDisabled);
+          if (panel.hidden === active) panel.hidden = !active;
+          toggleState(panel, "data-active", active);
+          toggleState(panel, "data-inactive", !active);
+          toggleState(panel, "data-disabled", effectiveDisabled);
+        }
+      });
+      host.addEventListener("pointerdown", pointerdown);
+      host.addEventListener("click", click);
+      host.addEventListener("focusin", focus);
+      host.addEventListener("keydown", keydown);
+      return cleanup;
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
   });
 
   return html`<slot name="list"></slot><slot name="panel"></slot>`;

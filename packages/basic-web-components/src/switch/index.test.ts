@@ -129,6 +129,10 @@ describe("switch behavior", () => {
 
     root.remove();
     label.append(root);
+    const reconnectedParts = parts(root);
+    expect(reconnectedParts.button).toBe(button);
+    expect(reconnectedParts.input).toBe(input);
+    expect(reconnectedParts.thumb).toBe(thumb);
     input.click();
     expect(root.checked).toBe(false);
     expect(callback.mock.calls).toEqual([[true], [false]]);

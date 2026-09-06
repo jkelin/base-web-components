@@ -63,13 +63,25 @@ bun run build
 Static `html` templates are lowered at build (`build/static-html.ts`,
 `staticHtmlPlugin`, build only) to a `staticHtml("...")` helper from a
 virtual module; dynamic, non-tag, re-exported, `eval`, colliding, and
-invalid-escape uses stay on the full runtime path unchanged. BWC total
-35,675 / 14,653 / 12,989 raw/gzip-9/brotli-11 (was 38,340 / 15,680 /
-13,917); standalone `microfw.js` is unchanged. Cost is build-only (~300 ms
-extra BWC build time, no new dependencies, no public behavior/API change —
-compiled output changes). Maintenance:
-one TS-internal AST flag (the `templateFlags` invalid-escape bit) pinned by
-the invalid-escape consumer regression — re-check its value on TS upgrades
+invalid-escape uses stay on the full runtime path unchanged. With
+dependency-scoped component effects, the seven entries plus `shared.js` total
+38,888 / 16,303 / 14,489 raw/gzip-9/brotli-11; standalone `microfw.js` remains
+11,257 / 4,309 / 3,914. The static-template-only baseline was
+35,675 / 14,653 / 12,989. Generated native parts (switch control, OTP
+fields) come from existing `html` templates with per-mount bind/dispose
+(38,902 / 16,304 / 14,490 pre-format, +722 / +292 / +260 over the 3-way
+winner below; final oxfmt −14 bytes). The static-compiler fast path is
+preserved; readability and structural markup improved while bytes and mount
+allocations grow — no size-reduction claim for this follow-up.
+
+Runtime updates are split by topology, content, ARIA/state, forms, classes, and
+geometry. Slotted families resolve validated targets only when light-DOM
+topology changes; state effects consume the resulting target signal, and
+delegated listeners stay mount-owned. This adds 3,213 / 1,650 / 1,500 bytes
+over the static-template baseline but removes unrelated DOM reconciliation on
+ordinary updates. There is no public interface change or dependency. The
+build-only compiler still costs about 300 ms and retains one TS-internal AST
+flag (`templateFlags` invalid-escape bit); re-check it on TypeScript upgrades
 (see `optimization-size-report.md`).
 
 ## Smoke

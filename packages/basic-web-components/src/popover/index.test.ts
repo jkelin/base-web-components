@@ -52,6 +52,19 @@ describe("native slot structure", () => {
 });
 
 describe("state and native dismissal", () => {
+  it("keeps the trigger cursor synchronized with disabled state", () => {
+    const { root, trigger } = createPopover();
+    document.body.append(root);
+
+    root.disabled = true;
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.style.cursor).toBe("not-allowed");
+
+    root.disabled = false;
+    expect(trigger.disabled).toBe(false);
+    expect(trigger.style.cursor).toBe("pointer");
+  });
+
   it("preserves uncontrolled state across reconnects", () => {
     const { close, popup, root, trigger } = createPopover();
     const callback = vi.fn();

@@ -142,20 +142,33 @@ describe("generated OTP fields", () => {
   it("preserves value and behavior across length changes and reconnects", () => {
     const root = mount(4, 'default-value="1234"');
     const originalFirst = fields(root)[0];
+    originalFirst!.focus();
+    originalFirst!.setSelectionRange(0, 1);
+    expect(document.activeElement).toBe(originalFirst);
+    expect(originalFirst!.selectionStart).toBe(0);
+    expect(originalFirst!.selectionEnd).toBe(1);
 
     root.length = 6;
     expect(root.value).toBe("1234");
     expect(fields(root)).toHaveLength(6);
     expect(fields(root)[0]).toBe(originalFirst);
+    expect(document.activeElement).toBe(originalFirst);
+    expect(originalFirst!.selectionStart).toBe(0);
+    expect(originalFirst!.selectionEnd).toBe(1);
     root.value = "987654";
     expect(fields(root).map((field) => field.value)).toEqual(["9", "8", "7", "6", "5", "4"]);
+    const removedTail = fields(root).at(-1);
+    removedTail!.focus();
+    expect(document.activeElement).toBe(removedTail);
 
     root.length = 3;
     expect(root.value).toBe("987");
     expect(fields(root)).toHaveLength(3);
+    expect(document.activeElement).toBe(document.body);
     root.remove();
     document.body.append(root);
     expect(root.value).toBe("987");
+    expect(fields(root)[0]).toBe(originalFirst);
     expect(fields(root).map((field) => field.value)).toEqual(["9", "8", "7"]);
   });
 

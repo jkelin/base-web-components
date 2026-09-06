@@ -183,47 +183,33 @@ export function belongsToHost(target: Node, host: HTMLElement): boolean {
 
 export function observeSlotSubtree(
   host: HTMLElement,
-  sync: () => void,
+  sync: (records: readonly MutationRecord[]) => void,
   attributeFilter?: string[],
 ): () => void {
-  sync();
+  sync([]);
 
   let active = true;
-  let pending = false;
   const observerOptions: MutationObserverInit = {
     attributes: true,
     childList: true,
     subtree: true,
   };
   if (attributeFilter) observerOptions.attributeFilter = attributeFilter;
-  let observer: MutationObserver;
-  const observe = () => observer.observe(host, observerOptions);
-  const run = () => {
+  const observer = new MutationObserver((records) => {
+    const ownedRecords = records.filter((record) => belongsToHost(record.target, host));
+    if (ownedRecords.length === 0) return;
     observer.disconnect();
     try {
-      sync();
+      sync(ownedRecords);
     } finally {
-      if (active) observe();
+      if (active) observer.observe(host, observerOptions);
     }
-  };
-  const schedule = () => {
-    if (!active || pending) return;
-    pending = true;
-    queueMicrotask(() => {
-      pending = false;
-      if (active) run();
-    });
-  };
-  observer = new MutationObserver((records) => {
-    if (records.some((record) => belongsToHost(record.target, host))) schedule();
   });
-  observe();
-  host.shadowRoot?.addEventListener("slotchange", schedule);
+  observer.observe(host, observerOptions);
 
   return () => {
     active = false;
     observer.disconnect();
-    host.shadowRoot?.removeEventListener("slotchange", schedule);
   };
 }
 
@@ -265,7 +251,17 @@ export function createPartClassController(
   apply(initialPartClass);
   return apply;
 }
+export function removeAttributeValue(element: Element, name: string): void {
+  if (element.hasAttribute(name)) element.removeAttribute(name);
+}
 
+export function setAttributeValue(element: Element, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
+export function toggleState(element: Element, name: string, present: boolean): void {
+  if (element.hasAttribute(name) !== present) element.toggleAttribute(name, present);
+}
 export function decorateButton(
   button: HTMLButtonElement,
   marker: string,
@@ -276,7 +272,8 @@ export function decorateButton(
   if (button.className !== className) button.className = className;
   button.dataset.testid ||= testId;
   button.id ||= nextId(testId);
-  button.type = "button";
-  button.style.userSelect = "none";
-  button.style.cursor = button.disabled ? "not-allowed" : "pointer";
+  if (button.type !== "button") button.type = "button";
+  if (button.style.userSelect !== "none") button.style.userSelect = "none";
+  const cursor = button.disabled ? "not-allowed" : "pointer";
+  if (button.style.cursor !== cursor) button.style.cursor = cursor;
 }

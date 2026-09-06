@@ -1,11 +1,14 @@
-import { defineComponent, effect, html, onMount, useHost, useProp } from "microfw";
+import { defineComponent, effect, html, onMount, signal, useHost, useProp } from "microfw";
 import {
   booleanProp,
   callbackProp,
   createPartClassController,
   emit,
   nextId,
+  setAttributeValue,
+  removeAttributeValue,
   stringProp,
+  toggleState,
   type ChangeCallback,
 } from "../shared";
 
@@ -18,15 +21,15 @@ type ClassController = (partClass?: string | null) => void;
 
 export const BwcSwitchElement = defineComponent(BWC_SWITCH_TAG, () => {
   const host = useHost();
-  let checked = false;
+  const checked = signal(false);
   let controlled = host.hasAttribute("checked");
   let initialized = false;
   const checkedProp = useProp("checked", {
     ...booleanProp("checked"),
-    get: () => checked,
+    get: () => checked(),
     onSet: (next, commit) => {
       controlled = true;
-      checked = next;
+      checked(next);
       commit(next);
     },
   });
@@ -46,17 +49,34 @@ export const BwcSwitchElement = defineComponent(BWC_SWITCH_TAG, () => {
     callbackProp<boolean>("onCheckedChange"),
   );
 
-  const button = document.createElement("button");
-  const thumb = document.createElement("span");
-  const input = document.createElement("input");
+  const partsTemplate = html`
+    <button slot="control" data-testid="bwc-switch-button" type="button" role="switch">
+      <span data-testid="bwc-switch-thumb"></span>
+    </button>
+    <input
+      slot="form-control"
+      data-testid="bwc-switch-input"
+      type="checkbox"
+      tabindex="-1"
+      aria-hidden="true"
+    />
+  `;
+  const button = partsTemplate.fragment.querySelector("button");
+  const thumb = partsTemplate.fragment.querySelector("span");
+  const input = partsTemplate.fragment.querySelector("input");
+  if (!button || !thumb || !input) throw new TypeError("bwc-switch template is invalid");
   let applyButtonClass: ClassController | undefined;
   let applyThumbClass: ClassController | undefined;
   let applyInputClass: ClassController | undefined;
   let associatedForm: HTMLFormElement | null = null;
   const reset = () => {
     if (controlled || host.hasAttribute("checked")) return;
-    checked = defaultChecked();
-    sync();
+    const next = defaultChecked();
+    if (next === checked()) {
+      input.checked = next;
+    } else {
+      checked(next);
+    }
   };
   const updateFormListener = () => {
     const nextForm = input.form;
@@ -65,84 +85,25 @@ export const BwcSwitchElement = defineComponent(BWC_SWITCH_TAG, () => {
     associatedForm = nextForm;
     associatedForm?.addEventListener("reset", reset);
   };
-  const sync = () => {
-    const requestedChecked = checkedProp();
-    if (host.hasAttribute("checked")) controlled = true;
-    if (!initialized) {
-      initialized = true;
-      checked = controlled ? requestedChecked : defaultChecked();
-    } else if (controlled) {
-      checked = requestedChecked;
-    }
-
-    const isDisabled = disabled();
-    const isReadOnly = readOnly();
-    const isRequired = required();
-    applyButtonClass?.(buttonClass());
-    applyThumbClass?.(thumbClass());
-    applyInputClass?.(inputClass());
-
-    button.disabled = isDisabled;
-    button.style.cursor = isDisabled ? "not-allowed" : "pointer";
-    button.setAttribute("aria-checked", String(checked));
-    button.setAttribute("aria-disabled", String(isDisabled));
-    button.setAttribute("aria-readonly", String(isReadOnly));
-    button.setAttribute("aria-required", String(isRequired));
-    const label = ariaLabel();
-    if (label) button.setAttribute("aria-label", label);
-    else button.removeAttribute("aria-label");
-
-    input.value = value();
-    input.defaultChecked = controlled ? checked : defaultChecked();
-    input.checked = checked;
-    input.disabled = isDisabled;
-    input.required = isRequired;
-    for (const [attribute, next] of [
-      ["name", name()],
-      ["form", form()],
-    ] as const) {
-      if (next) input.setAttribute(attribute, next);
-      else input.removeAttribute(attribute);
-    }
-
-    for (const node of [host, button, thumb]) {
-      node.toggleAttribute("data-checked", checked);
-      node.toggleAttribute("data-unchecked", !checked);
-      node.toggleAttribute("data-disabled", isDisabled);
-      node.toggleAttribute("data-readonly", isReadOnly);
-      node.toggleAttribute("data-required", isRequired);
-    }
-    updateFormListener();
-  };
   const requestChecked = (next: boolean) => {
     // Native checkbox activation precedes change; rejected requests restore rendered state.
-    if (disabled() || readOnly() || next === checked) {
-      sync();
+    if (disabled() || readOnly() || next === checked()) {
+      if (input.checked !== checked()) input.checked = checked();
       return;
     }
     emit(host, onCheckedChange(), "checked-change", "checked", next);
-    if (!controlled) checked = next;
-    sync();
+    if (!controlled) checked(next);
+    else if (input.checked !== checked()) input.checked = checked();
   };
-  const click = () => requestChecked(!checked);
+  const click = () => requestChecked(!checked());
   const change = () => requestChecked(input.checked);
 
   onMount(() => {
     host.id ||= nextId(BWC_SWITCH_TAG);
     button.id ||= `${host.id}-button`;
-    button.dataset.testid ||= BWC_SWITCH_BUTTON_TEST_ID;
-    button.type = "button";
-    button.slot = "control";
-    button.setAttribute("role", "switch");
     button.style.userSelect = "none";
-    thumb.dataset.testid ||= BWC_SWITCH_THUMB_TEST_ID;
     thumb.style.userSelect = "none";
-    input.dataset.testid ||= BWC_SWITCH_INPUT_TEST_ID;
     input.id ||= nextId(BWC_SWITCH_INPUT_TEST_ID);
-    input.type = "checkbox";
-    input.slot = "form-control";
-    input.tabIndex = -1;
-    input.setAttribute("aria-hidden", "true");
     Object.assign(input.style, {
       border: "0",
       clip: "rect(0 0 0 0)",
@@ -159,21 +120,91 @@ export const BwcSwitchElement = defineComponent(BWC_SWITCH_TAG, () => {
     if (thumb.parentElement !== button) button.append(thumb);
     if (button.parentElement !== host) host.append(button);
     if (input.parentElement !== host) host.append(input);
+    const disposeTemplate = partsTemplate.bind();
+    try {
+      applyButtonClass ??= createPartClassController(button, "switch-button", buttonClass());
+      applyThumbClass ??= createPartClassController(thumb, "switch-thumb", thumbClass());
+      applyInputClass ??= createPartClassController(input, "switch-input", inputClass());
+      const stopControl = effect(() => {
+        const requestedChecked = checkedProp();
+        if (host.hasAttribute("checked")) controlled = true;
+        if (!initialized) {
+          initialized = true;
+          checked(controlled ? requestedChecked : defaultChecked());
+        } else if (controlled) {
+          checked(requestedChecked);
+        }
+      });
+      const stopClasses = effect(() => {
+        applyButtonClass?.(buttonClass());
+        applyThumbClass?.(thumbClass());
+        applyInputClass?.(inputClass());
+      });
+      const stopState = effect(() => {
+        const isChecked = checked();
+        const isDisabled = disabled();
+        const isReadOnly = readOnly();
+        const isRequired = required();
+        if (button.disabled !== isDisabled) button.disabled = isDisabled;
+        const cursor = isDisabled ? "not-allowed" : "pointer";
+        if (button.style.cursor !== cursor) button.style.cursor = cursor;
+        setAttributeValue(button, "aria-checked", String(isChecked));
+        setAttributeValue(button, "aria-disabled", String(isDisabled));
+        setAttributeValue(button, "aria-readonly", String(isReadOnly));
+        setAttributeValue(button, "aria-required", String(isRequired));
+        const label = ariaLabel();
+        if (label) setAttributeValue(button, "aria-label", label);
+        else removeAttributeValue(button, "aria-label");
 
-    applyButtonClass ??= createPartClassController(button, "switch-button", buttonClass());
-    applyThumbClass ??= createPartClassController(thumb, "switch-thumb", thumbClass());
-    applyInputClass ??= createPartClassController(input, "switch-input", inputClass());
-    const dispose = effect(sync);
-    button.addEventListener("click", click);
-    input.addEventListener("change", change);
+        for (const node of [host, button, thumb]) {
+          toggleState(node, "data-checked", isChecked);
+          toggleState(node, "data-unchecked", !isChecked);
+          toggleState(node, "data-disabled", isDisabled);
+          toggleState(node, "data-readonly", isReadOnly);
+          toggleState(node, "data-required", isRequired);
+        }
+      });
+      const stopFormState = effect(() => {
+        const isChecked = checked();
+        const isDisabled = disabled();
+        const isRequired = required();
+        const nextDefault = controlled ? isChecked : defaultChecked();
+        if (input.defaultChecked !== nextDefault) input.defaultChecked = nextDefault;
+        if (input.checked !== isChecked) input.checked = isChecked;
+        if (input.disabled !== isDisabled) input.disabled = isDisabled;
+        if (input.required !== isRequired) input.required = isRequired;
+      });
+      const stopFormIdentity = effect(() => {
+        const nextValue = value();
+        if (input.value !== nextValue) input.value = nextValue;
+        for (const [attribute, next] of [
+          ["name", name()],
+          ["form", form()],
+        ] as const) {
+          if (next) setAttributeValue(input, attribute, next);
+          else removeAttributeValue(input, attribute);
+        }
+        updateFormListener();
+      });
+      button.addEventListener("click", click);
+      input.addEventListener("change", change);
 
-    return () => {
-      dispose();
-      button.removeEventListener("click", click);
-      input.removeEventListener("change", change);
-      associatedForm?.removeEventListener("reset", reset);
-      associatedForm = null;
-    };
+      return () => {
+        stopFormIdentity();
+        stopFormState();
+        stopState();
+        stopClasses();
+        stopControl();
+        button.removeEventListener("click", click);
+        input.removeEventListener("change", change);
+        associatedForm?.removeEventListener("reset", reset);
+        associatedForm = null;
+        disposeTemplate();
+      };
+    } catch (error) {
+      disposeTemplate();
+      throw error;
+    }
   });
 
   return html`<slot name="control"></slot><slot name="form-control"></slot>`;
