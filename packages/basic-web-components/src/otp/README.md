@@ -53,8 +53,8 @@ from the focused field; `ArrowLeft`/`ArrowRight` move between fields.
 | `form`             | `form`               | `string`                                           | `""`                                     | Associates fields + hidden input with a form by id.                           |
 | `autocomplete`     | `autocomplete`       | `string`                                           | `"one-time-code"`                        | Written to every field.                                                       |
 | `inputMode`        | `inputmode`          | `string`                                           | `"numeric"` for `numeric`, else `"text"` | Empty falls back per `validation-type`.                                       |
-| `fieldClass`       | `field-class`        | `string`                                           | `""`                                     | Extra Tailwind classes per field.                                             |
-| `hiddenInputClass` | `hidden-input-class` | `string`                                           | `""`                                     | Extra Tailwind classes for the hidden input.                                  |
+| `fieldClass`       | `field-class`        | `string`                                           | `""`                                     | Extra classes per field.                                                      |
+| `hiddenInputClass` | `hidden-input-class` | `string`                                           | `""`                                     | Extra classes for the hidden input.                                           |
 | `onValueChange`    | — (property only)    | `((value: string) => void) \| null`                | `null`                                   | Fires on every committed edit.                                                |
 | `onValueComplete`  | — (property only)    | `((value: string) => void) \| null`                | `null`                                   | Fires when the value reaches `length`.                                        |
 

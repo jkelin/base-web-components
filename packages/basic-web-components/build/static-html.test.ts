@@ -76,6 +76,39 @@ it("renders exact cooked static markup and keeps shadowed local tags", async () 
   expect(second.view.fragment.querySelector("p")!.textContent).toBe("line\nitem");
 });
 
+it("minifies static tag whitespace while keeping the parsed DOM identical", async () => {
+  const source = `
+    import { html } from "microfw";
+    export function render() {
+      return html\`<div
+        data-overlay
+        data-testid="bwc-slide-out-overlay"
+        hidden
+        style="position:fixed;inset:0;background:rgb(0 0 0 / 0.4)"
+        title="a > b"
+      ></div>
+      <slot name="trigger"></slot><slot name="panel"></slot>\`;
+    }
+  `;
+
+  const compiled = compileStaticHtmlTemplates(source, "fixture.ts");
+  expect(compiled).not.toBeNull();
+  const embedded = compiled!.match(/__bwcStaticHtml\((.*)\)/)?.[1];
+  expect(embedded).toBeDefined();
+  expect(JSON.parse(embedded!)).toBe(
+    '<div data-overlay data-testid="bwc-slide-out-overlay" hidden style="position:fixed;inset:0;background:rgb(0 0 0 / 0.4)" title="a > b"></div><slot name="trigger"></slot><slot name="panel"></slot>',
+  );
+
+  const fixture = await buildFixture(source);
+  const view = fixture.render() as HtmlTemplate;
+  const overlay = view.fragment.querySelector("div");
+  expect(overlay?.hasAttribute("data-overlay")).toBe(true);
+  expect(overlay?.getAttribute("title")).toBe("a > b");
+  expect(overlay?.getAttribute("style")).toBe("position:fixed;inset:0;background:rgb(0 0 0 / 0.4)");
+  expect(view.fragment.querySelectorAll("slot")).toHaveLength(2);
+  expect([...view.fragment.childNodes].every((node) => node.nodeType === 1)).toBe(true);
+});
+
 it("keeps a mixed unsafe module unchanged and fully reactive", async () => {
   const fixture = await buildFixture(`
     import { html, signal } from "microfw";

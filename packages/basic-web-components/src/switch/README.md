@@ -49,9 +49,9 @@ thumb `span`) and an `input slot="form-control"` itself. Never author them.
 | `value`           | `value`           | `string`                               | `"on"`  | Form field value (hidden input).               |
 | `form`            | `form`            | `string`                               | `""`    | Associates the hidden input with a form by id. |
 | `ariaLabel`       | `aria-label`      | `string`                               | `""`    | Label for the switch button.                   |
-| `buttonClass`     | `button-class`    | `string`                               | `""`    | Extra Tailwind classes for the button.         |
-| `thumbClass`      | `thumb-class`     | `string`                               | `""`    | Extra Tailwind classes for the thumb.          |
-| `inputClass`      | `input-class`     | `string`                               | `""`    | Extra Tailwind classes for the hidden input.   |
+| `buttonClass`     | `button-class`    | `string`                               | `""`    | Extra classes for the button.                  |
+| `thumbClass`      | `thumb-class`     | `string`                               | `""`    | Extra classes for the thumb.                   |
+| `inputClass`      | `input-class`     | `string`                               | `""`    | Extra classes for the hidden input.            |
 | `onCheckedChange` | — (property only) | `((checked: boolean) => void) \| null` | `null`  | Must be a function or null.                    |
 
 ### Events

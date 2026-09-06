@@ -224,19 +224,17 @@
                 slot="item"
                 data-value="details"
                 id="smoke-accordion-item"
-                class="block min-w-0 data-[open]:border-emerald-600"
+                class="block min-w-0"
                 data-testid="smoke-accordion-item"
               >
                 <summary
                   id="smoke-accordion-trigger"
-                  class="min-h-11 w-full min-w-0 cursor-pointer rounded border border-stone-300 bg-white px-3 py-2 text-left text-sm font-medium transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 aria-expanded:border-emerald-600 aria-expanded:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 data-[disabled]:opacity-40 data-[open]:border-emerald-600 data-[open]:bg-emerald-50"
                   data-testid="smoke-accordion-trigger"
                 >
                   Details
                 </summary>
                 <div
                   id="smoke-accordion-panel"
-                  class="mt-2 block min-w-0 rounded border border-stone-200 bg-stone-100 px-3 py-2 text-sm break-words text-stone-700 data-[open]:border-emerald-600"
                   data-testid="smoke-accordion-panel"
                 >
                   Selectable panel
@@ -251,9 +249,6 @@
               id="smoke-modal"
               data-testid="smoke-modal"
               class="flex min-w-0 flex-wrap items-center gap-2"
-              trigger-class="min-h-11 cursor-pointer rounded border border-stone-300 bg-white px-3 py-1 text-sm transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 data-[open]:border-emerald-600"
-              popup-class="m-auto max-w-[calc(100vw-2rem)] rounded-md border border-stone-300 bg-white p-4 text-sm text-stone-900 shadow-sm data-[open]:border-emerald-600"
-              close-class="ml-2 min-h-11 cursor-pointer rounded border border-stone-300 bg-stone-100 px-2 py-1 text-sm transition hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-300"
             >
               <button
                 slot="trigger"
@@ -263,7 +258,7 @@
                 Open modal
               </button>
               <dialog slot="popup" id="smoke-modal-popup" data-testid="smoke-modal-popup">
-                <span class="text-sm">Modal content</span>
+                <span>Modal content</span>
                 <button data-close id="smoke-modal-close" data-testid="smoke-modal-close">
                   Close
                 </button>
@@ -282,27 +277,12 @@
               side-offset="4"
               class="flex min-w-0 flex-wrap items-center gap-2"
             >
-              <button
-                slot="trigger"
-                id="smoke-popover-trigger"
-                class="min-h-11 cursor-pointer rounded border border-stone-300 bg-white px-3 py-1 text-sm transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 aria-expanded:border-emerald-600 aria-expanded:bg-emerald-50"
-                data-testid="smoke-popover-trigger"
-              >
+              <button slot="trigger" id="smoke-popover-trigger" data-testid="smoke-popover-trigger">
                 Open popover
               </button>
-              <div
-                slot="popup"
-                id="smoke-popover-popup"
-                class="min-w-0 rounded border border-stone-300 bg-white p-3 text-sm break-words shadow-sm data-[open]:border-emerald-600"
-                data-testid="smoke-popover-popup"
-              >
+              <div slot="popup" id="smoke-popover-popup" data-testid="smoke-popover-popup">
                 Popover content
-                <button
-                  data-close
-                  id="smoke-popover-close"
-                  class="ml-2 min-h-11 cursor-pointer rounded border border-stone-300 bg-stone-100 px-2 py-1 text-sm transition hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-300"
-                  data-testid="smoke-popover-close"
-                >
+                <button data-close id="smoke-popover-close" class="ml-2" data-testid="smoke-popover-close">
                   Close
                 </button>
               </div>
@@ -324,9 +304,6 @@
               <bwc-switch
                 id="smoke-switch"
                 data-testid="smoke-switch"
-                button-class="flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-stone-300 bg-white px-0.5 transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[checked]:border-emerald-600 data-[checked]:bg-emerald-600 data-[readonly]:opacity-70"
-                thumb-class="size-5 rounded-full bg-stone-400 transition-transform data-[checked]:translate-x-[22px] data-[checked]:bg-white"
-                input-class=""
               ></bwc-switch>
             </div>
           </div>
@@ -341,8 +318,6 @@
               length="4"
               validation-type="numeric"
               name="smoke-code"
-              field-class="h-11 w-11 rounded-md border border-stone-300 bg-white text-center font-mono text-lg outline-none hover:border-stone-400 focus-visible:border-stone-900 focus-visible:ring-2 focus-visible:ring-stone-900/15 disabled:cursor-not-allowed disabled:opacity-40 data-[complete]:border-emerald-600 data-[complete]:bg-emerald-50"
-              hidden-input-class=""
               class="flex min-w-0 flex-wrap gap-2"
             ></bwc-otp>
           </div>
@@ -355,21 +330,11 @@
               default-value="one"
               class="grid min-w-0 grid-cols-1 gap-2"
             >
-              <div slot="list" class="flex min-w-0 gap-1 overflow-x-auto border-b border-stone-200">
-                <button
-                  id="smoke-tab-one"
-                  class="min-h-11 cursor-pointer rounded-t border-b-2 border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-stone-500 transition hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 aria-selected:border-emerald-600 aria-selected:font-semibold aria-selected:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[active]:border-emerald-600 data-[active]:text-stone-900"
-                  data-testid="smoke-tab-one"
-                  value="one"
-                >
+              <div slot="list" class="min-w-0 overflow-x-auto">
+                <button id="smoke-tab-one" data-testid="smoke-tab-one" value="one">
                   One
                 </button>
-                <button
-                  id="smoke-tab-two"
-                  class="min-h-11 cursor-pointer rounded-t border-b-2 border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-stone-500 transition hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 aria-selected:border-emerald-600 aria-selected:font-semibold aria-selected:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[active]:border-emerald-600 data-[active]:text-stone-900"
-                  data-testid="smoke-tab-two"
-                  value="two"
-                >
+                <button id="smoke-tab-two" data-testid="smoke-tab-two" value="two">
                   Two
                 </button>
               </div>
@@ -377,7 +342,6 @@
                 slot="panel"
                 data-value="one"
                 id="smoke-tab-panel-one"
-                class="min-w-0 rounded border border-stone-200 p-3 text-sm break-words data-[active]:border-emerald-600"
                 data-testid="smoke-tab-panel-one"
               >
                 One panel
@@ -386,7 +350,6 @@
                 slot="panel"
                 data-value="two"
                 id="smoke-tab-panel-two"
-                class="min-w-0 rounded border border-stone-200 p-3 text-sm break-words data-[active]:border-emerald-600"
                 data-testid="smoke-tab-panel-two"
               >
                 Two panel

@@ -2,5 +2,5 @@
 // *.svelte), so Svelte components are intentionally excluded here. Their
 // <script> blocks are still covered by per-package `lint` via oxlint.
 export default {
-  "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc}": "oxfmt --write",
+  "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,css,md}": "oxfmt --write",
 };

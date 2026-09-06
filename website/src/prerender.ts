@@ -321,9 +321,7 @@ function indexMain(
     // One muted line next to the component name: element name plus the
     // build-time entry size (omitted until the lib has been built once).
     const meta =
-      size === undefined || size === null
-        ? component.tag
-        : `${component.tag} · Built JS: ${size.built} · gzip: ${size.gzip}`;
+      size === undefined || size === null ? component.tag : `${component.tag} · gzip: ${size.gzip}`;
     return `<section aria-label="${component.title} example" data-testid="index-${component.slug}">
   <h2 class="text-lg font-semibold tracking-tight">${component.title}</h2>
   <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-${component.slug}-meta">${meta}</p>
@@ -333,12 +331,10 @@ function indexMain(
 </section>`;
   }).join("\n");
   return `<div>
-  <p class="text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Documentation</p>
   <h1 class="mt-2 text-4xl font-bold tracking-tight">basic-web-components</h1>
   <p class="mt-3 text-lg text-stone-600 dark:text-stone-400">Small self-registering web components with native slots. One page per component: a live example plus the full README reference.</p>
 </div>
-<h2 class="mt-10 mb-4 text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">All components</h2>
-<div class="grid grid-cols-1 gap-8">${sections}</div>`;
+<div class="mt-8 grid grid-cols-1 gap-8">${sections}</div>`;
 }
 function buildLlmsTxt(docs: Array<DocSource>): string {
   const lines = [
@@ -422,7 +418,7 @@ async function componentSize(slug: string): Promise<{ built: string; gzip: strin
 // separate badge paragraph. Keeps the `size-<slug>` testid hook.
 function sizeTitleSpan(slug: string, size: { built: string; gzip: string } | null): string {
   if (size === null) return "";
-  return ` <span data-testid="size-${slug}" class="font-mono text-sm font-normal text-stone-500 dark:text-stone-400">Built JS: ${size.built} · gzip: ${size.gzip}</span>`;
+  return ` <span data-testid="size-${slug}" class="font-mono text-sm font-normal text-stone-500 dark:text-stone-400">gzip: ${size.gzip}</span>`;
 }
 
 // Appends the size span to the first h1 (the README `# <tag>` title). Falls
@@ -437,7 +433,7 @@ function withSizeInTitle(
   if (/<h1[\s>]/.test(html)) {
     return html.replace(/<h1([^>]*)>([\s\S]*?)<\/h1>/, `<h1$1>$2${sizeTitleSpan(slug, size)}</h1>`);
   }
-  return `${html}\n<p data-testid="size-${slug}" class="mt-3 font-mono text-xs text-stone-500 dark:text-stone-400">Built JS: ${size.built} · gzip: ${size.gzip}</p>`;
+  return `${html}\n<p data-testid="size-${slug}" class="mt-3 font-mono text-xs text-stone-500 dark:text-stone-400">gzip: ${size.gzip}</p>`;
 }
 // Sitemap over every emitted page (index.html -> the site root), served in
 // dev and emitted into dist/ on build via the texts map.

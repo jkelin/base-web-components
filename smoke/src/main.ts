@@ -131,16 +131,8 @@ async function exerciseSuites() {
   accordionTrigger.click();
   await waitFor(() => accordionItem.open, false, "accordion close");
 
-  // Switch toggles its generated button, thumb, and native form input.
   const switchLabel = required<HTMLLabelElement>("#smoke-switch-label");
   const switchRoot = required<SwitchElement>("#smoke-switch");
-  if (
-    switchRoot.getAttribute("button-class") === null ||
-    switchRoot.getAttribute("thumb-class") === null ||
-    switchRoot.getAttribute("input-class") === null
-  ) {
-    throw new Error("switch part-class inputs are missing");
-  }
   const switchButton = switchRoot.querySelector<HTMLButtonElement>(
     '[data-testid="bwc-switch-button"]',
   );
@@ -199,14 +191,6 @@ async function exerciseSuites() {
   }
 
   // Modal opens its native dialog host and closes it.
-  const modalRoot = required("#smoke-modal");
-  if (
-    modalRoot.getAttribute("trigger-class") === null ||
-    modalRoot.getAttribute("popup-class") === null ||
-    modalRoot.getAttribute("close-class") === null
-  ) {
-    throw new Error("modal part-class inputs are missing");
-  }
   const modalTrigger = required<HTMLButtonElement>("#smoke-modal-trigger");
   const modalPopup = required("#smoke-modal-popup");
   const modalClose = required<HTMLButtonElement>("#smoke-modal-close");
@@ -276,9 +260,6 @@ async function exerciseSuites() {
   // Length-generated OTP fields settle in one task; paste through the first field syncs value and hidden input.
   const otp = required<OtpElement>("#smoke-otp");
   if (otp.getAttribute("length") !== "4") throw new Error("otp root length is not 4");
-  if (otp.getAttribute("field-class") === null || otp.getAttribute("hidden-input-class") === null) {
-    throw new Error("otp part-class inputs are missing");
-  }
   if (otp.querySelector("[is]") !== null) {
     throw new Error("otp fields must be generated native inputs");
   }

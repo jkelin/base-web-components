@@ -51,9 +51,9 @@ Trigger clicks toggle; `data-close` clicks and native light-dismiss close.
 | `disabled`     | `disabled`        | `boolean`                                | `false`    | Disables the trigger; toggle requests are ignored.                        |
 | `side`         | `side`            | `"top" \| "right" \| "bottom" \| "left"` | `"bottom"` | Invalid values throw; reflected to `data-side` on the popup.              |
 | `sideOffset`   | `side-offset`     | `number`                                 | `0`        | Pixels, written to `--side-offset` on the popup. Non-finite values throw. |
-| `triggerClass` | `trigger-class`   | `string`                                 | `""`       | Extra Tailwind classes for the trigger.                                   |
-| `popupClass`   | `popup-class`     | `string`                                 | `""`       | Extra Tailwind classes for the popup.                                     |
-| `closeClass`   | `close-class`     | `string`                                 | `""`       | Extra Tailwind classes for each `data-close` button.                      |
+| `triggerClass` | `trigger-class`   | `string`                                 | `""`       | Extra classes for the trigger.                                            |
+| `popupClass`   | `popup-class`     | `string`                                 | `""`       | Extra classes for the popup.                                              |
+| `closeClass`   | `close-class`     | `string`                                 | `""`       | Extra classes for each `data-close` button.                               |
 | `onOpenChange` | — (property only) | `((open: boolean) => void) \| null`      | `null`     | Must be a function or null.                                               |
 
 ### Events

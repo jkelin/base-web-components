@@ -49,9 +49,9 @@ Controlled:
 | `open`         | `open`            | `boolean`                           | `false` | Present (or assigned) → controlled mode.               |
 | `defaultOpen`  | `default-open`    | `boolean`                           | `false` | Seed for uncontrolled mode.                            |
 | `disabled`     | `disabled`        | `boolean`                           | `false` | Disables the trigger; open/close requests are ignored. |
-| `triggerClass` | `trigger-class`   | `string`                            | `""`    | Extra Tailwind classes for the trigger.                |
-| `popupClass`   | `popup-class`     | `string`                            | `""`    | Extra Tailwind classes for the dialog.                 |
-| `closeClass`   | `close-class`     | `string`                            | `""`    | Extra Tailwind classes for each `data-close` button.   |
+| `triggerClass` | `trigger-class`   | `string`                            | `""`    | Extra classes for the trigger.                         |
+| `popupClass`   | `popup-class`     | `string`                            | `""`    | Extra classes for the dialog.                          |
+| `closeClass`   | `close-class`     | `string`                            | `""`    | Extra classes for each `data-close` button.            |
 | `onOpenChange` | — (property only) | `((open: boolean) => void) \| null` | `null`  | Must be a function or null.                            |
 
 ### Events

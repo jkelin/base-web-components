@@ -1,3 +1,4 @@
+@import "basic-web-components/theme.css";
 @import "tailwindcss";
 
 @theme {

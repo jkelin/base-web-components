@@ -57,16 +57,16 @@ changes.
 
 ### Props
 
-| Prop           | Attribute       | Type                                | Default   | Description                                       |
-| -------------- | --------------- | ----------------------------------- | --------- | ------------------------------------------------- |
-| `open`         | `open`          | `boolean`                           | `false`   | Controlled open state.                            |
-| `defaultOpen`  | `default-open`  | `boolean`                           | `false`   | Initial state when uncontrolled.                  |
-| `disabled`     | `disabled`      | `boolean`                           | `false`   | Blocks trigger and open/close requests.           |
-| `side`         | `side`          | `"left" \| "right"`                 | `"right"` | Viewport edge the panel docks to.                 |
-| `triggerClass` | `trigger-class` | `string`                            | `""`      | Tailwind classes merged after the trigger marker. |
-| `panelClass`   | `panel-class`   | `string`                            | `""`      | Tailwind classes merged after the panel marker.   |
-| `closeClass`   | `close-class`   | `string`                            | `""`      | Tailwind classes merged after the close marker.   |
-| `onOpenChange` | —               | `((open: boolean) => void) \| null` | `null`    | Callback for every open/close request.            |
+| Prop           | Attribute       | Type                                | Default   | Description                              |
+| -------------- | --------------- | ----------------------------------- | --------- | ---------------------------------------- |
+| `open`         | `open`          | `boolean`                           | `false`   | Controlled open state.                   |
+| `defaultOpen`  | `default-open`  | `boolean`                           | `false`   | Initial state when uncontrolled.         |
+| `disabled`     | `disabled`      | `boolean`                           | `false`   | Blocks trigger and open/close requests.  |
+| `side`         | `side`          | `"left" \| "right"`                 | `"right"` | Viewport edge the panel docks to.        |
+| `triggerClass` | `trigger-class` | `string`                            | `""`      | Classes merged after the trigger marker. |
+| `panelClass`   | `panel-class`   | `string`                            | `""`      | Classes merged after the panel marker.   |
+| `closeClass`   | `close-class`   | `string`                            | `""`      | Classes merged after the close marker.   |
+| `onOpenChange` | —               | `((open: boolean) => void) \| null` | `null`    | Callback for every open/close request.   |
 
 Invalid `side` values throw at the boundary; they never fall back silently.
 

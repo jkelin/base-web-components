@@ -2,11 +2,11 @@ import { createSignal } from "solid-js";
 import { render } from "@solidjs/web";
 import "microlighter/themes/github.css";
 import { highlightAll } from "microlighter";
+import "basic-web-components/theme.css";
 import "./styles.css";
 
 // Real custom elements by package subpath (never dist paths); importing
 // registers them so the prerendered demo markup upgrades on load.
-import "basic-web-components/counter";
 import "basic-web-components/accordion";
 import "basic-web-components/modal";
 import "basic-web-components/popover";
@@ -15,6 +15,7 @@ import "basic-web-components/otp";
 import "basic-web-components/tabs";
 
 import { COMPONENTS } from "./site";
+import { mountStylingIslands } from "./styling";
 import { ThemeToggle } from "./theme";
 
 const toggleMount = document.getElementById("theme-toggle-mount");
@@ -133,11 +134,15 @@ async function highlightCodeBlocks(): Promise<void> {
 
 mountDemoToggles();
 mountReadouts();
+mountStylingIslands();
 void highlightCodeBlocks();
 // SPA router contract (see src/nav.ts): after each content swap the router
 // dispatches `bwc:page-swapped`; remount islands onto the fresh nodes.
+// The header stays mounted, so the popover configurator binds once while the
+// page configurator remounts onto each fresh `#main`.
 document.addEventListener("bwc:page-swapped", () => {
   mountDemoToggles();
   mountReadouts();
+  mountStylingIslands();
   void highlightCodeBlocks();
 });

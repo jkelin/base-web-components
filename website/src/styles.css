@@ -1,10 +1,21 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 /* Class-based dark mode: the toggle adds `.dark` on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 body {
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
   text-rendering: optimizeLegibility;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
 }
 /* Microlighter client-side highlighting (github theme): the prerender emits
  * raw escaped code and the client registers CSS Custom Highlights. The theme
@@ -85,7 +96,7 @@ html.dark [data-syntax-theme="github"] {
   color: var(--color-emerald-400);
 }
 .doc code:not(pre code) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.8125em;
   padding: 0.125rem 0.375rem;
   border-radius: 0.375rem;
@@ -108,7 +119,7 @@ html.dark [data-syntax-theme="github"] {
 .doc pre code {
   display: block;
   padding: 0.875rem 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.8125rem;
   line-height: 1.65;
 }
@@ -231,7 +242,7 @@ html.dark [data-syntax-theme="github"] {
 .demo-code pre code {
   display: block;
   padding: 0.875rem 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.8125rem;
   line-height: 1.65;
 }

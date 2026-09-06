@@ -111,12 +111,58 @@ function defineAccordion(): { new (): AccordionApi } {
       callbackProp<string[]>("onValueChange"),
     );
 
+    // Atomic single-open switching: a summary click toggles its details in
+    // the click task's default action, but the `toggle` event driving state
+    // arrives in a later task — a frame can paint with both the old and the
+    // new item open (a height spike even when start/end heights match).
+    // Closing the previously-open item synchronously in a capture listener
+    // runs in the same task as the upcoming native toggle, so the switch
+    // never paints both open. No API change: value/events flow as before,
+    // through the regular toggle handler below.
+    const quietClose = new Set<string>();
+
+    const closeOthersOnClick = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const summary = target.closest("summary");
+      if (!summary) return;
+      const currentParts = parts();
+      if (!currentParts || multiple() || controlled() || disabled()) return;
+      const item = currentParts.find((candidate) => candidate.summary === summary);
+      if (!item || item.details.open || item.details.hasAttribute("disabled")) return;
+      for (const other of currentParts) {
+        if (other !== item && other.details.open && currentValue().includes(other.value)) {
+          quietClose.add(other.value);
+          other.details.open = false;
+        }
+      }
+    };
+
     const toggle = (event: Event) => {
       const details = event.target;
       const currentParts = parts();
       if (!(details instanceof HTMLDetailsElement) || !currentParts) return;
       const item = currentParts.find((candidate) => candidate.details === details);
       if (!item) return;
+      if (quietClose.has(item.value)) {
+        quietClose.delete(item.value);
+        // Echo of the click-path pre-close above: the DOM already matches
+        // the upcoming switch and the opening item's toggle (queued after
+        // this one) owns the state update, so stay silent here. If that
+        // toggle never arrives (the click was prevented), roll the
+        // pre-close back so value and DOM cannot desync.
+        const closed = item;
+        setTimeout(() => {
+          if (
+            closed.details.isConnected &&
+            currentValue().includes(closed.value) &&
+            !closed.details.open
+          ) {
+            closed.details.open = true;
+          }
+        }, 0);
+        return;
+      }
 
       const selected = currentValue();
       const alreadySynchronized = details.open === selected.includes(item.value);
@@ -142,6 +188,7 @@ function defineAccordion(): { new (): AccordionApi } {
       let stopState: (() => void) | undefined;
       const cleanup = () => {
         host.removeEventListener("toggle", toggle, true);
+        host.removeEventListener("click", closeOthersOnClick, true);
         stopObserver?.();
         stopState?.();
         stopControl?.();
@@ -220,6 +267,7 @@ function defineAccordion(): { new (): AccordionApi } {
           }
         });
         host.addEventListener("toggle", toggle, true);
+        host.addEventListener("click", closeOthersOnClick, true);
         return cleanup;
       } catch (error) {
         cleanup();

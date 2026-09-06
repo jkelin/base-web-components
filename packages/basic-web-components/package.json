@@ -4,7 +4,8 @@
   "description": "Small self-registering web components.",
   "files": [
     "dist",
-    "src/*/index.ts"
+    "src/*/index.ts",
+    "src/theme.css"
   ],
   "type": "module",
   "sideEffects": [
@@ -83,7 +84,8 @@
       "development": "./src/slide-out/index.ts",
       "import": "./dist/slide-out.js",
       "default": "./dist/slide-out.js"
-    }
+    },
+    "./theme.css": "./src/theme.css"
   },
   "scripts": {
     "build": "vite build",

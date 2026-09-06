@@ -260,6 +260,40 @@ describe("native accordion", () => {
 
     expect(changes).not.toHaveBeenCalled();
   });
+
+  it("closes the open item in the same task as a summary click, so switches never paint both open", async () => {
+    const one = item("one");
+    const two = item("two");
+    const root = document.createElement("bwc-accordion") as AccordionApi;
+    root.defaultValue = ["one"];
+    root.append(one.details, two.details);
+    document.body.append(root);
+    const changes = vi.fn();
+    root.onValueChange = changes;
+    await settle();
+    expect(one.details.open).toBe(true);
+
+    // Real click order: the click event (capture) lands before the UA
+    // toggles the clicked details, and each toggle queues its event after.
+    two.summary.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    // The pre-close runs in the click task (same task as the native toggle
+    // of the clicked item), so both items are never open together — no
+    // both-open frame can paint, whatever the backend's activation behavior.
+    expect(one.details.open && two.details.open).toBe(false);
+
+    two.details.open = true;
+    // Only the opening toggle is dispatched manually: the pre-close echo
+    // arrives on its own in browsers (and in DOM backends that auto-fire
+    // toggle), and the guard above must swallow it without emitting.
+    two.details.dispatchEvent(new Event("toggle"));
+    await settle();
+
+    expect(root.value).toEqual(["two"]);
+    expect(one.details.open).toBe(false);
+    expect(two.details.open).toBe(true);
+    expect(changes).toHaveBeenCalledTimes(1);
+    expect(changes).toHaveBeenCalledWith(["two"]);
+  });
 });
 
 it("retains a constructible root export", () => {

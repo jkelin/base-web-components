@@ -7,15 +7,15 @@ native slots. Importing an entry self-registers its elements.
 
 ## Entries
 
-| Subpath                          | Children                                                                                        |
-| -------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `basic-web-components/counter`   | `<button slot="decrement">`, `<output slot="value">`, `<button slot="increment">`               |
-| `basic-web-components/accordion` | `<details slot="item" data-value="…">` with `<summary>` title plus panel `<div>`                 |
-| `basic-web-components/modal`     | `<button slot="trigger">`, `<dialog slot="popup">`, inner `<button data-close>`                 |
-| `basic-web-components/popover`   | `<button slot="trigger">`, `<div slot="popup">`, inner `<button data-close>`                    |
-| `basic-web-components/switch`    | generated `button slot="control"` + thumb `span` + hidden `input` (never author them)           |
-| `basic-web-components/otp`       | `length`-generated native `input slot="field"` fields plus hidden `input slot="form-control"`   |
-| `basic-web-components/tabs`      | `<div slot="list">` of `<button value="…">` plus `<section slot="panel" data-value="…">`         |
+| Subpath                          | Children                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `basic-web-components/counter`   | `<button slot="decrement">`, `<output slot="value">`, `<button slot="increment">`             |
+| `basic-web-components/accordion` | `<details slot="item" data-value="…">` with `<summary>` title plus panel `<div>`              |
+| `basic-web-components/modal`     | `<button slot="trigger">`, `<dialog slot="popup">`, inner `<button data-close>`               |
+| `basic-web-components/popover`   | `<button slot="trigger">`, `<div slot="popup">`, inner `<button data-close>`                  |
+| `basic-web-components/switch`    | generated `button slot="control"` + thumb `span` + hidden `input` (never author them)         |
+| `basic-web-components/otp`       | `length`-generated native `input slot="field"` fields plus hidden `input slot="form-control"` |
+| `basic-web-components/tabs`      | `<div slot="list">` of `<button value="…">` plus `<section slot="panel" data-value="…">`      |
 
 Children are plain native elements projected through slots — never custom
 child tags, never `is=` (customized built-ins are gone). `bwc-switch` and
@@ -43,11 +43,17 @@ keep stable `id`/`data-testid` values (`bwc-switch-button`, `bwc-switch-thumb`,
   `useProp`, bundled `signal`).
 - `packages/basic-web-components` — the seven family entries.
 - `smoke/` — Vite harness importing entries by subpath from source.
+  Breaking cutover: custom child tags and `is=` customized built-ins are
+  gone. Children are plain native elements with `slot` attributes (see
+  Entries); update markup accordingly — e.g. `<button is="bwc-tab">`
+  becomes a plain `<button value="…">` inside `<div slot="list">`.
 
-Breaking cutover: custom child tags and `is=` customized built-ins are
-gone. Children are plain native elements with `slot` attributes (see
-Entries); update markup accordingly — e.g. `<button is="bwc-tab">`
-becomes a plain `<button value="…">` inside `<div slot="list">`.
+## Styling
+
+Two options: the optional variable-driven default CSS
+(`basic-web-components/theme.css`, themed with zero classes) or direct styling
+with Tailwind/any CSS on slotted children and part props. See
+[`docs/styling.md`](docs/styling.md) for both, with examples.
 
 ## Commands
 
