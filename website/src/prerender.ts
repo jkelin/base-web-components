@@ -1,7 +1,6 @@
-// Docs prerender as a Vite plugin (replaces the old `bun scripts/generate.ts`
-// step): reads each component README, renders it to HTML with shiki syntax
-// highlighting, and emits one static HTML file per page plus the markdown
-// sources and llms.txt.
+// Docs prerender as a Vite plugin: reads each component README, renders it to
+// HTML with raw escaped code blocks (highlighted client-side with microlighter),
+// and emits one static HTML file per page plus the markdown sources and llms.txt.
 //
 // - `vite build`: page/markdown assets are emitted into dist/ via
 //   `generateBundle` (client scripts resolve to their hashed chunk names),
@@ -11,18 +10,21 @@
 //   navigation, markdown, and llms.txt all work without a prior build.
 // Run via `bun run build` / `bun run dev`.
 import { readFile } from "node:fs/promises";
+import { gzipSync } from "node:zlib";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { marked, type RendererObject, type Token } from "marked";
-import { createHighlighter, type Highlighter } from "shiki";
+import { marked, type RendererObject } from "marked";
 import type { Plugin } from "vite";
-import { COMPONENTS } from "./site.ts";
+import { COMPONENTS, stripExampleAttributes } from "./site.ts";
+import { phosphorIcon } from "./icons.ts";
+
+const SITE_BASE = "https://jkelin.github.io/base-web-components/";
+const GITHUB_URL = "https://github.com/jkelin/base-web-components";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LIB = resolve(ROOT, "..", "packages", "basic-web-components", "src");
+const LIB_DIST = resolve(ROOT, "..", "packages", "basic-web-components", "dist");
 
-const LIGHT_THEME = "github-light";
-const DARK_THEME = "github-dark";
 const CODE_LANGS = ["html", "js", "ts", "bash", "shell", "json", "css", "diff", "text"] as const;
 
 function slugify(text: string): string {
@@ -86,43 +88,21 @@ async function loadDoc(
   }
 }
 
-function highlightCode(highlighter: Highlighter, text: string, lang: string | undefined): string {
+// Raw code blocks for client-side highlighting: prerender emits the escaped
+// source with a `language-*` class (plus data-language for microlighter's
+// fallback lookup); src/client.tsx runs microlighter's highlightAll() on load
+// and after each SPA page swap. Unknown languages (e.g. `text`) and no-JS
+// readers fall back to the plain escaped source — no build-time highlighter.
+function codeBlock(text: string, lang: string | undefined): string {
   const language =
     lang !== undefined && (CODE_LANGS as readonly string[]).includes(lang) ? lang : "text";
-  try {
-    return highlighter.codeToHtml(text, {
-      lang: language,
-      themes: { light: LIGHT_THEME, dark: DARK_THEME },
-    });
-  } catch {
-    return `<pre class="shiki"><code>${escapeHtml(text)}</code></pre>`;
-  }
-}
-function collectCodeBlocks(tokens: Array<Token>, into: Array<Token>): void {
-  for (const token of tokens) {
-    if (token.type === "code") {
-      into.push(token);
-    }
-    if ("tokens" in token && Array.isArray(token.tokens)) {
-      collectCodeBlocks(token.tokens as Array<Token>, into);
-    }
-    if ("items" in token && Array.isArray(token.items)) {
-      for (const item of token.items as Array<{ tokens?: Array<Token> }>) {
-        if (item.tokens) collectCodeBlocks(item.tokens, into);
-      }
-    }
-  }
+  return `<pre data-language="${language}"><code class="language-${language}">${escapeHtml(text)}</code></pre>`;
 }
 
-function createRenderer(highlighted: ReadonlyMap<string, string>): RendererObject {
+function createRenderer(): RendererObject {
   return {
     code({ text, lang }) {
-      // Every fenced block was highlighted up front; the fallback keeps the
-      // shiki class so no <pre> renders unstyled in either theme.
-      return (
-        highlighted.get(`${lang ?? ""}\n${text}`) ??
-        `<pre class="shiki"><code>${escapeHtml(text)}</code></pre>`
-      );
+      return codeBlock(text, lang);
     },
     heading({ tokens, depth }) {
       const inline = this.parser.parseInline(tokens);
@@ -163,10 +143,13 @@ function sidebar(active: string): string {
       true,
     ),
   ).join("\n");
-  return `<nav aria-label="Components" class="min-w-0">
-  <p class="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Components</p>
+  return `<nav aria-label="Docs" class="min-w-0">
+  <p class="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Overview</p>
   <ul class="mt-2 space-y-0.5">
     ${link("./", "Overview", active === "index")}
+  </ul>
+  <p class="mt-6 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Components</p>
+  <ul class="mt-2 space-y-0.5">
     ${items}
   </ul>
 </nav>`;
@@ -177,11 +160,11 @@ function sidebar(active: string): string {
 // sidebar instead; the hamburger trigger is inert until upgrade).
 function mobileMenu(active: string): string {
   return `<bwc-slide-out id="site-menu" data-testid="site-menu" class="lg:hidden">
-  <button slot="trigger" id="menu-button" data-testid="menu-button" type="button" aria-label="Open menu" class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white px-2 text-base transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-stone-800">☰</button>
+  <button slot="trigger" id="menu-button" data-testid="menu-button" type="button" aria-label="Open menu" class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-stone-800">${phosphorIcon("menu", 16)}</button>
   <div slot="panel" id="menu-panel" data-testid="menu-panel" class="overflow-y-auto bg-white p-4 dark:bg-stone-900">
     <div class="mb-3 flex items-center justify-between gap-2">
       <span class="font-mono text-sm font-semibold">basic-web-components</span>
-      <button data-close id="menu-close" data-testid="menu-close" type="button" aria-label="Close menu" class="min-h-11 min-w-11 cursor-pointer rounded-md border border-stone-300 px-2 text-base transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:hover:bg-stone-800">✕</button>
+      <button data-close id="menu-close" data-testid="menu-close" type="button" aria-label="Close menu" class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-stone-300 px-2 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:hover:bg-stone-800">${phosphorIcon("x", 20)}</button>
     </div>
     ${sidebar(active)}
   </div>
@@ -199,6 +182,8 @@ function shell(options: {
   scripts: string;
 }): string {
   const markdownHref = options.active === "index" ? "./index.md" : `./${options.active}.md`;
+  const canonical = options.active === "index" ? SITE_BASE : `${SITE_BASE}${options.active}.html`;
+  const fullTitle = `${options.title} · basic-web-components`;
   // Sidebar: top-89px equals the in-flow offset (57px sticky header + 32px
   // grid pt), so the nav is pixel-identical scrolled or not. The -ml-3
   // wrapper cancels the links px-3, aligning link text with the header icon.
@@ -208,7 +193,14 @@ function shell(options: {
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="${escapeHtml(options.description)}" />
-<title>${escapeHtml(options.title)} · basic-web-components</title>
+<link rel="canonical" href="${canonical}" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="basic-web-components" />
+<meta property="og:title" content="${escapeHtml(fullTitle)}" />
+<meta property="og:description" content="${escapeHtml(options.description)}" />
+<meta property="og:url" content="${canonical}" />
+<meta name="twitter:card" content="summary" />
+<title>${escapeHtml(fullTitle)}</title>
 ${options.head}${THEME_INIT}
 ${CRITICAL_CSS}
 ${NOSCRIPT_CSS}
@@ -216,14 +208,17 @@ ${NOSCRIPT_CSS}
 <body class="min-h-screen bg-stone-50 text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
 <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:rounded focus:bg-stone-900 focus:px-3 focus:py-1 focus:text-white">Skip to content</a>
 <header class="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/90 dark:border-stone-800 dark:bg-stone-950/90">
-  <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+  <!-- Blur lives on this inner layer, not the header: backdrop-filter on the header would make it the containing block for the mobile slide-out's fixed panel + dismiss overlay (see menu-containment.test.ts). -->
+  <div aria-hidden="true" data-testid="header-blur" class="pointer-events-none absolute inset-0 backdrop-blur-md"></div>
+  <div class="relative mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
     <a href="./" data-testid="nav-home" class="flex min-w-0 items-center gap-2">
       <span aria-hidden="true" class="flex size-7 items-center justify-center rounded-md bg-stone-900 font-mono text-sm font-bold text-white dark:bg-stone-100 dark:text-stone-900">b</span>
       <span data-testid="nav-wordmark" class="hidden truncate font-mono text-sm font-semibold sm:block">basic-web-components</span>
     </a>
     <div class="flex items-center gap-2">
-      <a id="nav-markdown" href="${markdownHref}" data-testid="nav-markdown" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">${options.active}.md</a>
-      <a href="./llms.txt" data-testid="nav-llms" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">llms.txt</a>
+      <a id="nav-markdown" href="${markdownHref}" data-testid="nav-markdown" target="_blank" rel="noopener" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">${options.active}.md</a>
+      <a href="./llms.txt" data-testid="nav-llms" target="_blank" rel="noopener" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">llms.txt</a>
+      <a id="nav-github" href="${GITHUB_URL}" data-testid="nav-github" aria-label="GitHub repository" title="GitHub repository" target="_blank" rel="noopener noreferrer" class="flex size-7 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100">${phosphorIcon("github", 16)}</a>
       <div id="theme-toggle-mount" data-testid="theme-toggle-mount"></div>
       ${mobileMenu(options.active)}
     </div>
@@ -234,7 +229,7 @@ ${NOSCRIPT_CSS}
   <main id="main" data-page="${options.active}" class="min-w-0">${options.main}</main>
 </div>
 <footer class="border-t border-stone-200 dark:border-stone-800">
-  <p class="mx-auto max-w-6xl px-4 py-6 font-mono text-xs text-stone-500 sm:px-6 dark:text-stone-400">basic-web-components docs · static prerender · <a class="underline underline-offset-2" href="./llms.txt" data-testid="nav-llms-footer">llms.txt</a></p>
+  <p class="mx-auto max-w-6xl px-4 py-6 font-mono text-xs text-stone-500 sm:px-6 dark:text-stone-400">basic-web-components docs · <a class="underline underline-offset-2" href="${GITHUB_URL}" data-testid="nav-github-footer" target="_blank" rel="noopener noreferrer">GitHub</a> · <a class="underline underline-offset-2" href="./sitemap.xml" data-testid="nav-sitemap" target="_blank" rel="noopener">sitemap.xml</a> · <a class="underline underline-offset-2" href="./llms.txt" data-testid="nav-llms-footer" target="_blank" rel="noopener">llms.txt</a></p>
 </footer>
 ${options.scripts}</body>
 </html>
@@ -245,39 +240,48 @@ function demoCard(
   slug: string,
   tag: string,
   demo: string,
-  demoHighlighted: string,
+  demoCode: string,
   readoutInitial: string,
 ): string {
   // Preview/Code toggle: two native buttons (keyboard accessible) flipping
   // `hidden` on the panes, so the live demo keeps its DOM state when
-  // switching back. The code pane reuses the shiki pipeline at build time —
-  // no client highlighter. `demo` is the exact source shown in Code.
+  // switching back. The code pane shows the stripped example source (ids,
+  // testids, and classes removed) as raw escaped text, highlighted on the
+  // client with microlighter. `demo` stays full markup for the live preview.
   return `<section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
-    <h2 class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</h2>
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
     <div role="group" aria-label="Demo view" class="flex items-center gap-1">
       <button type="button" id="demo-${slug}-toggle-preview" data-testid="demo-${slug}-toggle-preview" data-demo-toggle="${slug}" data-demo-view="preview" aria-pressed="true" aria-controls="demo-${slug}-preview demo-${slug}-code" class="demo-toggle">Preview</button>
       <button type="button" id="demo-${slug}-toggle-code" data-testid="demo-${slug}-toggle-code" data-demo-toggle="${slug}" data-demo-view="code" aria-pressed="false" aria-controls="demo-${slug}-preview demo-${slug}-code" class="demo-toggle">Code</button>
     </div>
   </div>
   <div id="demo-${slug}-preview" data-testid="demo-${slug}-preview" data-demo-pane="${slug}" data-demo-pane-view="preview" class="p-4 sm:p-5">${demo}</div>
-  <div id="demo-${slug}-code" data-testid="demo-${slug}-code" data-demo-pane="${slug}" data-demo-pane-view="code" class="demo-code" hidden>${demoHighlighted}</div>
+  <div id="demo-${slug}-code" data-testid="demo-${slug}-code" data-demo-pane="${slug}" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden>${demoCode}</div>
   <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="${slug}" data-testid="demo-${slug}-readout">${escapeHtml(readoutInitial)}</span></div>
 </section>`;
 }
 
-function indexMain(demoHighlighted: ReadonlyMap<string, string>): string {
-  const sections = COMPONENTS.map(
-    (
-      component,
-    ) => `<section aria-label="${component.title} example" data-testid="index-${component.slug}">
-  <p class="font-mono text-xs text-emerald-700 dark:text-emerald-400">${component.tag}</p>
-  <h2 class="mt-1 text-lg font-semibold tracking-tight">${component.title}</h2>
+function indexMain(
+  demoCode: ReadonlyMap<string, string>,
+  sizes: ReadonlyMap<string, { built: string; gzip: string } | null>,
+): string {
+  const sections = COMPONENTS.map((component) => {
+    const size = sizes.get(component.slug);
+    // One muted line next to the component name: element name plus the
+    // build-time entry size (omitted until the lib has been built once).
+    const meta =
+      size === undefined || size === null
+        ? component.tag
+        : `${component.tag} · Built JS: ${size.built} · gzip: ${size.gzip}`;
+    return `<section aria-label="${component.title} example" data-testid="index-${component.slug}">
+  <h2 class="text-lg font-semibold tracking-tight">${component.title}</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-${component.slug}-meta">${meta}</p>
   <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">${escapeHtml(component.blurb)}</p>
-  ${demoCard(component.slug, component.tag, component.demo, demoHighlighted.get(component.slug) ?? "", component.readoutInitial)}
+  ${demoCard(component.slug, component.tag, component.demo, demoCode.get(component.slug) ?? "", component.readoutInitial)}
   <p class="mt-3 text-sm"><a href="./${component.slug}.html" data-testid="index-${component.slug}-docs" class="underline underline-offset-4 hover:no-underline">View ${component.title} docs</a></p>
-</section>`,
-  ).join("\n");
+</section>`;
+  }).join("\n");
   return `<div>
   <p class="text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Documentation</p>
   <h1 class="mt-2 text-4xl font-bold tracking-tight">basic-web-components</h1>
@@ -341,67 +345,103 @@ interface PageInput {
 interface GeneratedSite {
   /** Page filename (index.html, <slug>.html) -> shell inputs. */
   pages: Map<string, PageInput>;
-  /** Raw text filename (index.md, <slug>.md, docs/<slug>.md, llms.txt). */
+  /** Raw text filename (index.md, <slug>.md, docs/<slug>.md, llms.txt, sitemap.xml). */
   texts: Map<string, string>;
 }
 
-async function generateSite(): Promise<GeneratedSite> {
-  const highlighter = await createHighlighter({
-    themes: [LIGHT_THEME, DARK_THEME],
-    langs: [...CODE_LANGS],
-  });
+// Built + gzip size of each component's dist entry, computed at prerender
+// time from packages/basic-web-components/dist/<slug>.js. Returns null when
+// the lib hasn't been built yet (dev before first build): the size is then
+// omitted so pages still render.
+async function componentSize(slug: string): Promise<{ built: string; gzip: string } | null> {
   try {
-    const pages = new Map<string, PageInput>();
-    const texts = new Map<string, string>();
-    const docs: Array<DocSource> = [];
-    const overviewDemos = new Map<string, string>();
-    for (const component of COMPONENTS) {
-      const doc = await loadDoc(component.slug, component.tag, component.subpath, component.blurb);
-      docs.push(doc);
-      // Shiki highlighting is sync, but marked renderers must be sync too: lex
-      // first, highlight every fenced block up front, then render from the map.
-      const blocks: Array<Token> = [];
-      collectCodeBlocks(marked.lexer(doc.markdown), blocks);
-      const highlighted = new Map<string, string>();
-      for (const block of blocks) {
-        if (block.type !== "code") continue;
-        const key = `${block.lang ?? ""}\n${block.text}`;
-        if (!highlighted.has(key)) {
-          highlighted.set(key, highlightCode(highlighter, block.text, block.lang));
-        }
-      }
-      marked.use({ renderer: createRenderer(highlighted) });
-      const html = wrapTables(marked.parse(doc.markdown, { async: false }));
-      marked.use({ renderer: null });
-      const demoHighlighted = highlightCode(highlighter, component.demo, "html");
-      overviewDemos.set(component.slug, demoHighlighted);
-      pages.set(`${component.slug}.html`, {
-        title: doc.title,
-        description: doc.description,
-        active: component.slug,
-        main: `${demoCard(component.slug, component.tag, component.demo, demoHighlighted, component.readoutInitial)}
-<article class="doc mt-8" data-testid="doc-${component.slug}">${html}</article>`,
-      });
-      // Raw markdown sources: sibling /<slug>.md routes plus the docs/ copies.
-      texts.set(`docs/${component.slug}.md`, doc.markdown);
-      texts.set(`${component.slug}.md`, doc.markdown);
-    }
-
-    pages.set("index.html", {
-      title: "Overview",
-      description:
-        "Documentation for basic-web-components: one live page per component plus full README references.",
-      active: "index",
-      main: indexMain(overviewDemos),
-    });
-    texts.set("index.md", indexMarkdown(docs));
-    texts.set("llms.txt", buildLlmsTxt(docs));
-    return { pages, texts };
-  } finally {
-    highlighter.dispose();
+    const file = await readFile(join(LIB_DIST, `${slug}.js`));
+    const kb = (bytes: number): string => `${(bytes / 1024).toFixed(1)} kB`;
+    return { built: kb(file.length), gzip: kb(gzipSync(file).length) };
+  } catch {
+    return null;
   }
 }
+// Size line inside the component title (h1), in a smaller grey span — not a
+// separate badge paragraph. Keeps the `size-<slug>` testid hook.
+function sizeTitleSpan(slug: string, size: { built: string; gzip: string } | null): string {
+  if (size === null) return "";
+  return ` <span data-testid="size-${slug}" class="font-mono text-sm font-normal text-stone-500 dark:text-stone-400">Built JS: ${size.built} · gzip: ${size.gzip}</span>`;
+}
 
+// Appends the size span to the first h1 (the README `# <tag>` title). Falls
+// back to a badge paragraph when the markdown has no h1 — never happens today
+// (the stub always starts with `# <tag>`), but keeps the size visible anyway.
+function withSizeInTitle(
+  html: string,
+  slug: string,
+  size: { built: string; gzip: string } | null,
+): string {
+  if (size === null) return html;
+  if (/<h1[\s>]/.test(html)) {
+    return html.replace(/<h1([^>]*)>([\s\S]*?)<\/h1>/, `<h1$1>$2${sizeTitleSpan(slug, size)}</h1>`);
+  }
+  return `${html}\n<p data-testid="size-${slug}" class="mt-3 font-mono text-xs text-stone-500 dark:text-stone-400">Built JS: ${size.built} · gzip: ${size.gzip}</p>`;
+}
+// Sitemap over every emitted page (index.html -> the site root), served in
+// dev and emitted into dist/ on build via the texts map.
+function sitemapXml(pageFiles: Iterable<string>): string {
+  const urls = [...pageFiles]
+    .filter((file) => file.endsWith(".html"))
+    .sort()
+    .map((file) => (file === "index.html" ? SITE_BASE : `${SITE_BASE}${file}`));
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    `${urls.map((url) => `  <url><loc>${url}</loc></url>`).join("\n")}\n` +
+    `</urlset>\n`
+  );
+}
+
+async function generateSite(): Promise<GeneratedSite> {
+  const pages = new Map<string, PageInput>();
+  const texts = new Map<string, string>();
+  const docs: Array<DocSource> = [];
+  const overviewDemos = new Map<string, string>();
+  const overviewSizes = new Map<string, { built: string; gzip: string } | null>();
+  for (const component of COMPONENTS) {
+    const doc = await loadDoc(component.slug, component.tag, component.subpath, component.blurb);
+    docs.push(doc);
+    // Code blocks render raw (escaped); the client highlights them, so marked
+    // renders straight through with a sync renderer.
+    marked.use({ renderer: createRenderer() });
+    const html = wrapTables(marked.parse(doc.markdown, { async: false }));
+    marked.use({ renderer: null });
+    // Code pane shows the stripped example source; the preview keeps `demo` verbatim.
+    const exampleSource = stripExampleAttributes(component.demo);
+    const demoCode = codeBlock(exampleSource, "html");
+    overviewDemos.set(component.slug, demoCode);
+    const size = await componentSize(component.slug);
+    overviewSizes.set(component.slug, size);
+    pages.set(`${component.slug}.html`, {
+      title: doc.title,
+      description: doc.description,
+      active: component.slug,
+      main: `${demoCard(component.slug, component.tag, component.demo, demoCode, component.readoutInitial)}
+<article class="doc mt-8" data-syntax-theme="github" data-testid="doc-${component.slug}">${withSizeInTitle(html, component.slug, size)}</article>`,
+    });
+    // Raw markdown sources: sibling /<slug>.md routes plus the docs/ copies.
+    texts.set(`docs/${component.slug}.md`, doc.markdown);
+    texts.set(`${component.slug}.md`, doc.markdown);
+  }
+
+  pages.set("index.html", {
+    title: "Overview",
+    description:
+      "Documentation for basic-web-components: one live page per component plus full README references.",
+    active: "index",
+    main: indexMain(overviewDemos, overviewSizes),
+  });
+  texts.set("index.md", indexMarkdown(docs));
+  texts.set("sitemap.xml", sitemapXml(pages.keys()));
+  texts.set("llms.txt", buildLlmsTxt(docs));
+  return { pages, texts };
+}
 // Dev-mode client entries (transformed per request, HMR-capable).
 const DEV_SCRIPTS = `<script type="module" src="/src/client.tsx"></script>
 <script type="module" src="/src/nav.ts"></script>`;
@@ -463,7 +503,11 @@ export function docsPrerender(): Plugin {
             const text = site.texts.get(textKey) ?? "";
             res.setHeader(
               "Content-Type",
-              textKey.endsWith(".md") ? MARKDOWN_TYPE : "text/plain; charset=utf-8",
+              textKey.endsWith(".md")
+                ? MARKDOWN_TYPE
+                : textKey.endsWith(".xml")
+                  ? "application/xml; charset=utf-8"
+                  : "text/plain; charset=utf-8",
             );
             res.end(text);
             return;
@@ -483,14 +527,49 @@ export function docsPrerender(): Plugin {
         }
         throw new Error(`docs-prerender: missing chunk for ${suffix}`);
       };
-      const cssFiles = Object.values(bundle)
-        .filter((item) => item.type === "asset" && item.fileName.endsWith(".css"))
-        .map((item) => (item as { fileName: string }).fileName);
-      const head = cssFiles.map((file) => `<link rel="stylesheet" href="./${file}" />\n`).join("");
+      // Shared runtime chunk (client/nav imports): modulepreload it on every
+      // page so the browser fetches it with high priority alongside entries.
+      const cssFiles: Array<string> = [];
+      let preload = "";
+      for (const item of Object.values(bundle)) {
+        if (item.type === "asset" && item.fileName.endsWith(".css")) {
+          cssFiles.push(item.fileName);
+        } else if (
+          item.type === "chunk" &&
+          !item.isEntry &&
+          item.fileName.endsWith(".js") &&
+          preload === ""
+        ) {
+          preload = `<link rel="modulepreload" href="./${item.fileName}" />\n`;
+        }
+      }
+      const head =
+        preload + cssFiles.map((file) => `<link rel="stylesheet" href="./${file}" />\n`).join("");
       const scripts =
         `<script type="module" crossorigin src="./${chunkFile("/src/client.tsx")}"></script>\n` +
         `<script type="module" crossorigin src="./${chunkFile("/src/nav.ts")}"></script>`;
       const site = await getSite();
+      // Microlighter grammars: the client chunk dynamic-imports
+      // `./grammars/<lang>.js` relative to itself (Vite leaves that import
+      // native), so the docs languages are emitted as static assets beside
+      // the chunks and load on demand. `shell`/`js`/`ts` resolve to the
+      // bash/javascript/typescript grammars via built-in aliases, `diff` via
+      // the client's languageAliases, and `text` has no grammar (stays plain).
+      for (const lang of [
+        "html",
+        "javascript",
+        "typescript",
+        "bash",
+        "css",
+        "json",
+        "git-diff",
+      ] as const) {
+        const grammar = await readFile(
+          join(ROOT, "node_modules", "microlighter", "dist", "grammars", `${lang}.js`),
+          "utf8",
+        );
+        this.emitFile({ type: "asset", fileName: `assets/grammars/${lang}.js`, source: grammar });
+      }
       for (const [fileName, page] of site.pages) {
         this.emitFile({ type: "asset", fileName, source: shell({ ...page, head, scripts }) });
       }

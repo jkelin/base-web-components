@@ -11,8 +11,6 @@ import {
   toggleState,
 } from "../shared";
 
-export const BWC_ACCORDION_TAG = "bwc-accordion";
-
 type ChangeCallback<Value> = ((value: Value) => void) | null;
 
 type AccordionApi = HTMLElement & {
@@ -56,7 +54,7 @@ function accordionItems(host: HTMLElement): AccordionItem[] {
 export const BwcAccordionElement = defineAccordion();
 
 function defineAccordion(): { new (): AccordionApi } {
-  return defineComponent<AccordionApi>(BWC_ACCORDION_TAG, () => {
+  return defineComponent<AccordionApi>("bwc-accordion", () => {
     const host = useHost<AccordionApi>();
     const assignedValue = Object.hasOwn(host, "value");
     const controlled = signal(host.hasAttribute("value") || assignedValue);

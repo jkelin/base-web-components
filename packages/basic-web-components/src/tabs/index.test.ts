@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BWC_TABS_TAG, BwcTabsElement } from "./index";
+import { BwcTabsElement } from "./index";
 
 type Orientation = "horizontal" | "vertical";
 type ActivationMode = "automatic" | "manual";
@@ -37,7 +37,7 @@ function panel(value: string): HTMLElement {
 }
 
 function createTabs(): TabsFixture {
-  const root = document.createElement(BWC_TABS_TAG) as TabsApi;
+  const root = document.createElement("bwc-tabs") as TabsApi;
   const list = document.createElement("div");
   list.slot = "list";
   const first = tab("first");
@@ -203,7 +203,7 @@ describe("native tabs", () => {
   });
 
   it("validates one list and complete unique nonempty button-panel matches", () => {
-    const missingList = document.createElement(BWC_TABS_TAG);
+    const missingList = document.createElement("bwc-tabs");
     expect(() => document.body.append(missingList)).toThrow(/exactly one/);
     document.body.replaceChildren();
 

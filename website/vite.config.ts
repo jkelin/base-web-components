@@ -44,7 +44,7 @@ export default defineConfig({
     conditions: ["source", "development", "import", "module", "browser", "default"],
   },
   optimizeDeps: {
-    exclude: ["basic-web-components", "microfw"],
+    exclude: ["basic-web-components", "microfw", "microlighter"],
   },
   // All public assets (markdown, llms.txt) come from the prerender plugin;
   // nothing is copied from a public/ directory.

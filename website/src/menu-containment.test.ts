@@ -42,6 +42,13 @@ describe("menu containment", () => {
     }
   });
 
+  it("blurs scrolled content behind the bar via an inner layer, not the header", async () => {
+    const page = await shellHtml();
+    const header = /<header[^>]*>([\s\S]*?)<\/header>/.exec(page)?.[0] ?? "";
+    expect(header).toContain('data-testid="header-blur"');
+    expect(header).toContain("backdrop-blur");
+  });
+
   it("keeps the sticky header and the in-header menu trigger", async () => {
     const page = await shellHtml();
     const open = /<header[^>]*>/.exec(page)?.[0] ?? "";

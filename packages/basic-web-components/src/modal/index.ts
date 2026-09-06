@@ -15,8 +15,6 @@ import {
   type ChangeCallback,
 } from "../shared";
 
-export const BWC_MODAL_TAG = "bwc-modal";
-
 export type BwcModalElement = HTMLElement & {
   open: boolean;
   defaultOpen: boolean;
@@ -55,7 +53,7 @@ function releaseDocumentScrollLock(document: Document, owner: HTMLElement): void
   }
 }
 
-export const BwcModalElement = defineComponent<BwcModalElement>(BWC_MODAL_TAG, () => {
+export const BwcModalElement = defineComponent<BwcModalElement>("bwc-modal", () => {
   const host = useHost<BwcModalElement>();
   let controlled = host.hasAttribute("open") || Object.hasOwn(host, "open");
   const openState = signal(false);

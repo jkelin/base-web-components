@@ -6,18 +6,16 @@
 body {
   text-rendering: optimizeLegibility;
 }
-/* Shiki dual-theme code blocks (github-light / github-dark). The generate
- * script emits light colors inline plus `--shiki-dark-*` overrides; this
- * CSS activates the dark palette under `.dark`. (Chose shiki over
- * highlight.js: accurate TextMate grammars, zero client JS, and first-class
- * light+dark output at build time.) */
-.dark .shiki,
-.dark .shiki span {
-  color: var(--shiki-dark) !important;
-  background-color: var(--shiki-dark-bg) !important;
-  font-style: var(--shiki-dark-font-style) !important;
-  font-weight: var(--shiki-dark-font-weight) !important;
-  text-decoration: var(--shiki-dark-text-decoration) !important;
+/* Microlighter client-side highlighting (github theme): the prerender emits
+ * raw escaped code and the client registers CSS Custom Highlights. The theme
+ * follows the site `.dark` toggle — not the OS — via these color-scheme
+ * overrides (light-dark() resolves against the element's scheme). Without JS
+ * the plain source stays readable. */
+html:not(.dark) [data-syntax-theme="github"] {
+  color-scheme: light;
+}
+html.dark [data-syntax-theme="github"] {
+  color-scheme: dark;
 }
 
 /* Server-rendered README prose. */
@@ -223,7 +221,7 @@ body {
 .dark .demo-toggle:focus-visible {
   outline-color: var(--color-stone-100);
 }
-/* Demo code pane: shiki-highlighted exact demo source; card owns the border. */
+/* Demo code pane: client-highlighted exact demo source; card owns the border. */
 .demo-code pre {
   margin: 0;
   border: 0;

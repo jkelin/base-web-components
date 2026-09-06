@@ -110,3 +110,33 @@ document.addEventListener("click", (event) => {
 window.addEventListener("popstate", () => {
   void navigate(new URL(location.href), false);
 });
+// Sidebar hover prefetch: hovering (or keyboard-focusing) a docs link warms
+// the cache for the target page with one <link rel="prefetch"> per href. The
+// router fetches the same URL on click, and the page's JS (client/nav chunks)
+// is already loaded, so only the HTML document needs warming. Delegated on
+// `document`, so it survives SPA content swaps; no layout or behavior change.
+const prefetchedPages = new Set<string>();
+function prefetchPage(href: string): void {
+  if (prefetchedPages.has(href)) return;
+  let url: URL;
+  try {
+    url = new URL(href, location.href);
+  } catch {
+    return;
+  }
+  if (url.origin !== location.origin || slugFromUrl(url) === null) return;
+  prefetchedPages.add(href);
+  const link = document.createElement("link");
+  link.rel = "prefetch";
+  link.href = url.pathname + url.search;
+  document.head.append(link);
+}
+function prefetchFromEvent(target: unknown): void {
+  const anchor = target instanceof Element ? target.closest("a[href]") : null;
+  const href = anchor?.getAttribute("href");
+  if (href) prefetchPage(href);
+}
+document.addEventListener("pointerover", (event) => prefetchFromEvent(event.target), {
+  passive: true,
+});
+document.addEventListener("focusin", (event) => prefetchFromEvent(event.target));

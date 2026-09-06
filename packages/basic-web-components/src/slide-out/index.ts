@@ -24,8 +24,6 @@ if (typeof document !== "undefined" && !document.getElementById("bwc-slide-out-s
   document.head.append(style);
 }
 
-export const BWC_SLIDE_OUT_TAG = "bwc-slide-out";
-
 const sides = ["left", "right"] as const;
 type Side = (typeof sides)[number];
 
@@ -43,7 +41,7 @@ export type BwcSlideOutElement = HTMLElement & {
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export const BwcSlideOutElement = defineComponent<BwcSlideOutElement>(BWC_SLIDE_OUT_TAG, () => {
+export const BwcSlideOutElement = defineComponent<BwcSlideOutElement>("bwc-slide-out", () => {
   const host = useHost<BwcSlideOutElement>();
   let controlled = host.hasAttribute("open") || Object.hasOwn(host, "open");
   const openState = signal(false);

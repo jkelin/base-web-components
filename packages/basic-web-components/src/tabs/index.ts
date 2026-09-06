@@ -13,8 +13,6 @@ import {
   toggleState,
 } from "../shared";
 
-export const BWC_TABS_TAG = "bwc-tabs";
-
 type Orientation = "horizontal" | "vertical";
 type ActivationMode = "automatic" | "manual";
 type ChangeCallback<Value> = ((value: Value) => void) | null;
@@ -66,7 +64,7 @@ function tabsParts(host: HTMLElement): TabsParts {
   return { buttons, list, panels, panelByValue: panelsByValue };
 }
 
-export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
+export const BwcTabsElement = defineComponent<TabsApi>("bwc-tabs", () => {
   const host = useHost<TabsApi>();
   const assignedValue = Object.hasOwn(host, "value");
   let controlledSnapshot = host.hasAttribute("value") || assignedValue;
@@ -127,7 +125,7 @@ export const BwcTabsElement = defineComponent<TabsApi>(BWC_TABS_TAG, () => {
     const target = event.composedPath().find((entry) => entry instanceof HTMLButtonElement);
     const currentParts = parts();
     if (!(target instanceof HTMLButtonElement) || !currentParts) return undefined;
-    return currentParts.buttons.includes(target) && target.closest(BWC_TABS_TAG) === host
+    return currentParts.buttons.includes(target) && target.closest("bwc-tabs") === host
       ? target
       : undefined;
   };

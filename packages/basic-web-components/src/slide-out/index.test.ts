@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BWC_SLIDE_OUT_TAG, type BwcSlideOutElement } from "./index";
+import { type BwcSlideOutElement } from "./index";
+// Side-effect import: registering `bwc-slide-out` happens on module load.
+import "./index";
 
 type SlideOutElement = BwcSlideOutElement;
 
 function createSlideOut(options: { defaultOpen?: boolean; open?: boolean } = {}) {
-  const root = document.createElement(BWC_SLIDE_OUT_TAG) as SlideOutElement;
+  const root = document.createElement("bwc-slide-out") as SlideOutElement;
   root.toggleAttribute("default-open", options.defaultOpen ?? false);
   root.toggleAttribute("open", options.open ?? false);
 
@@ -35,7 +37,7 @@ afterEach(() => document.body.replaceChildren());
 
 describe("native slot structure", () => {
   it("requires one button trigger and one panel", () => {
-    const root = document.createElement(BWC_SLIDE_OUT_TAG) as SlideOutElement;
+    const root = document.createElement("bwc-slide-out") as SlideOutElement;
     expect(() => document.body.append(root)).toThrow();
     document.body.replaceChildren();
   });

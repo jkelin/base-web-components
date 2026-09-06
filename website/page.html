@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <script type="module" src="/@vite/client"></script>
+
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Documentation for basic-web-components: one live page per component plus full README references." />
+<link rel="canonical" href="https://jkelin.github.io/base-web-components/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="basic-web-components" />
+<meta property="og:title" content="Overview · basic-web-components" />
+<meta property="og:description" content="Documentation for basic-web-components: one live page per component plus full README references." />
+<meta property="og:url" content="https://jkelin.github.io/base-web-components/" />
+<meta name="twitter:card" content="summary" />
+<title>Overview · basic-web-components</title>
+<script>(function(){try{var t=localStorage.getItem("bwc-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark");}}catch(e){}})();</script>
+<style>html{background-color:#fafaf9}html.dark{background-color:#0c0a09}#main{transition:opacity 100ms ease-out}@media (prefers-reduced-motion:reduce){#main{transition:none}}bwc-slide-out:not(:defined)>[slot="panel"]{display:none}@media (max-width:1023.5px){#sidebar{display:none}}@media (min-width:1024px){#site-menu{display:none}}</style>
+<noscript><style>#sidebar{display:block !important}#site-menu{display:none !important}</style></noscript>
+</head>
+<body class="min-h-screen bg-stone-50 text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
+<a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:rounded focus:bg-stone-900 focus:px-3 focus:py-1 focus:text-white">Skip to content</a>
+<header class="sticky top-0 z-10 border-b border-stone-200 bg-stone-50/90 dark:border-stone-800 dark:bg-stone-950/90">
+  <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+    <a href="./" data-testid="nav-home" class="flex min-w-0 items-center gap-2">
+      <span aria-hidden="true" class="flex size-7 items-center justify-center rounded-md bg-stone-900 font-mono text-sm font-bold text-white dark:bg-stone-100 dark:text-stone-900">b</span>
+      <span data-testid="nav-wordmark" class="hidden truncate font-mono text-sm font-semibold sm:block">basic-web-components</span>
+    </a>
+    <div class="flex items-center gap-2">
+      <a id="nav-markdown" href="./index.md" data-testid="nav-markdown" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">index.md</a>
+      <a href="./llms.txt" data-testid="nav-llms" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">llms.txt</a>
+      <a id="nav-github" href="https://github.com/jkelin/base-web-components" data-testid="nav-github" aria-label="GitHub repository" title="GitHub repository" class="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-stone-300 bg-white px-2 text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" width="18" height="18"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg></a>
+      <div id="theme-toggle-mount" data-testid="theme-toggle-mount"></div>
+      <bwc-slide-out id="site-menu" data-testid="site-menu" class="lg:hidden">
+  <button slot="trigger" id="menu-button" data-testid="menu-button" type="button" aria-label="Open menu" class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white px-2 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-stone-800"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" width="20" height="20"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  <div slot="panel" id="menu-panel" data-testid="menu-panel" class="overflow-y-auto bg-white p-4 dark:bg-stone-900">
+    <div class="mb-3 flex items-center justify-between gap-2">
+      <span class="font-mono text-sm font-semibold">basic-web-components</span>
+      <button data-close id="menu-close" data-testid="menu-close" type="button" aria-label="Close menu" class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-stone-300 px-2 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:hover:bg-stone-800"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <nav aria-label="Docs" class="min-w-0">
+  <p class="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Overview</p>
+  <ul class="mt-2 space-y-0.5">
+    <li><a href="./" aria-current="page" data-testid="nav-overview" class="block rounded-md px-3 py-2 text-sm transition bg-stone-900 font-semibold text-white dark:bg-stone-100 dark:text-stone-900 ">Overview</a></li>
+  </ul>
+  <p class="mt-6 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Components</p>
+  <ul class="mt-2 space-y-0.5">
+    <li><a href="./counter.html" data-testid="nav-counter" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Counter · bwc-counter</a></li>
+<li><a href="./accordion.html" data-testid="nav-accordion" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Accordion · bwc-accordion</a></li>
+<li><a href="./modal.html" data-testid="nav-modal" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Modal · bwc-modal</a></li>
+<li><a href="./popover.html" data-testid="nav-popover" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Popover · bwc-popover</a></li>
+<li><a href="./switch.html" data-testid="nav-switch" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Switch · bwc-switch</a></li>
+<li><a href="./otp.html" data-testid="nav-otp" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">OTP · bwc-otp</a></li>
+<li><a href="./tabs.html" data-testid="nav-tabs" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Tabs · bwc-tabs</a></li>
+<li><a href="./slide-out.html" data-testid="nav-slide-out" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Slide-out · bwc-slide-out</a></li>
+  </ul>
+</nav>
+  </div>
+</bwc-slide-out>
+    </div>
+  </div>
+</header>
+<div class="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+  <aside id="sidebar" class="hidden lg:sticky lg:top-[89px] lg:block lg:self-start"><div class="-ml-3"><nav aria-label="Docs" class="min-w-0">
+  <p class="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Overview</p>
+  <ul class="mt-2 space-y-0.5">
+    <li><a href="./" aria-current="page" data-testid="nav-overview" class="block rounded-md px-3 py-2 text-sm transition bg-stone-900 font-semibold text-white dark:bg-stone-100 dark:text-stone-900 ">Overview</a></li>
+  </ul>
+  <p class="mt-6 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Components</p>
+  <ul class="mt-2 space-y-0.5">
+    <li><a href="./counter.html" data-testid="nav-counter" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Counter · bwc-counter</a></li>
+<li><a href="./accordion.html" data-testid="nav-accordion" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Accordion · bwc-accordion</a></li>
+<li><a href="./modal.html" data-testid="nav-modal" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Modal · bwc-modal</a></li>
+<li><a href="./popover.html" data-testid="nav-popover" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Popover · bwc-popover</a></li>
+<li><a href="./switch.html" data-testid="nav-switch" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Switch · bwc-switch</a></li>
+<li><a href="./otp.html" data-testid="nav-otp" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">OTP · bwc-otp</a></li>
+<li><a href="./tabs.html" data-testid="nav-tabs" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Tabs · bwc-tabs</a></li>
+<li><a href="./slide-out.html" data-testid="nav-slide-out" class="block rounded-md px-3 py-2 text-sm transition text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100 font-mono text-[13px]">Slide-out · bwc-slide-out</a></li>
+  </ul>
+</nav></div></aside>
+  <main id="main" data-page="index" class="min-w-0"><div>
+  <p class="text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Documentation</p>
+  <h1 class="mt-2 text-4xl font-bold tracking-tight">basic-web-components</h1>
+  <p class="mt-3 text-lg text-stone-600 dark:text-stone-400">Small self-registering web components with native slots. One page per component: a live example plus the full README reference.</p>
+</div>
+<h2 class="mt-10 mb-4 text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">All components</h2>
+<div class="grid grid-cols-1 gap-8"><section aria-label="Counter example" data-testid="index-counter">
+  <h2 class="text-lg font-semibold tracking-tight">Counter</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-counter-meta">bwc-counter · Built JS: 2.2 kB · gzip: 1.0 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">Numeric stepper: two buttons around a live readout.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-counter-toggle-preview" data-testid="demo-counter-toggle-preview" data-demo-toggle="counter" data-demo-view="preview" aria-pressed="true" aria-controls="demo-counter-preview demo-counter-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-counter-toggle-code" data-testid="demo-counter-toggle-code" data-demo-toggle="counter" data-demo-view="code" aria-pressed="false" aria-controls="demo-counter-preview demo-counter-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-counter-preview" data-testid="demo-counter-preview" data-demo-pane="counter" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-counter id="demo-counter" data-testid="demo-counter" default-value="3" class="flex flex-wrap items-center gap-3">
+  <button slot="decrement" id="demo-counter-minus" data-testid="demo-counter-minus" class="min-h-11 min-w-11 cursor-pointer rounded-md border border-stone-900 bg-stone-900 px-3 py-1 text-center font-mono text-sm text-white transition hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-950 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white">−</button>
+  <output slot="value" id="demo-counter-label" data-testid="demo-counter-label" class="min-w-10 rounded-md border border-stone-200 bg-stone-100 px-2 py-1 text-center font-mono text-lg tabular-nums text-stone-900 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"></output>
+  <button slot="increment" id="demo-counter-plus" data-testid="demo-counter-plus" class="min-h-11 min-w-11 cursor-pointer rounded-md border border-stone-900 bg-stone-900 px-3 py-1 text-center font-mono text-sm text-white transition hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-950 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white">+</button>
+</bwc-counter></div>
+  <div id="demo-counter-code" data-testid="demo-counter-code" data-demo-pane="counter" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-counter default-value=&quot;3&quot;&gt;
+  &lt;button slot=&quot;decrement&quot;&gt;−&lt;/button&gt;
+  &lt;output slot=&quot;value&quot;&gt;&lt;/output&gt;
+  &lt;button slot=&quot;increment&quot;&gt;+&lt;/button&gt;
+&lt;/bwc-counter&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="counter" data-testid="demo-counter-readout">3</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./counter.html" data-testid="index-counter-docs" class="underline underline-offset-4 hover:no-underline">View Counter docs</a></p>
+</section>
+<section aria-label="Accordion example" data-testid="index-accordion">
+  <h2 class="text-lg font-semibold tracking-tight">Accordion</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-accordion-meta">bwc-accordion · Built JS: 3.1 kB · gzip: 1.4 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">Collapsible sections built on native details elements.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-accordion-toggle-preview" data-testid="demo-accordion-toggle-preview" data-demo-toggle="accordion" data-demo-view="preview" aria-pressed="true" aria-controls="demo-accordion-preview demo-accordion-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-accordion-toggle-code" data-testid="demo-accordion-toggle-code" data-demo-toggle="accordion" data-demo-view="code" aria-pressed="false" aria-controls="demo-accordion-preview demo-accordion-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-accordion-preview" data-testid="demo-accordion-preview" data-demo-pane="accordion" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-accordion id="demo-accordion" data-testid="demo-accordion" default-value='["two"]' class="grid min-w-0 grid-cols-1 gap-2">
+  <details slot="item" data-value="one" id="demo-accordion-one" data-testid="demo-accordion-one" class="rounded-md border border-stone-300 dark:border-stone-700">
+    <summary id="demo-accordion-one-trigger" data-testid="demo-accordion-one-trigger" class="min-h-11 cursor-pointer px-3 py-2 text-sm font-medium select-none hover:bg-stone-100 dark:hover:bg-stone-800">One</summary>
+    <div id="demo-accordion-one-panel" data-testid="demo-accordion-one-panel" class="border-t border-stone-200 px-3 py-2 text-sm text-stone-600 dark:border-stone-700 dark:text-stone-400">One content</div>
+  </details>
+  <details slot="item" data-value="two" id="demo-accordion-two" data-testid="demo-accordion-two" class="rounded-md border border-stone-300 dark:border-stone-700">
+    <summary id="demo-accordion-two-trigger" data-testid="demo-accordion-two-trigger" class="min-h-11 cursor-pointer px-3 py-2 text-sm font-medium select-none hover:bg-stone-100 dark:hover:bg-stone-800">Two</summary>
+    <div id="demo-accordion-two-panel" data-testid="demo-accordion-two-panel" class="border-t border-stone-200 px-3 py-2 text-sm text-stone-600 dark:border-stone-700 dark:text-stone-400">Two content</div>
+  </details>
+</bwc-accordion></div>
+  <div id="demo-accordion-code" data-testid="demo-accordion-code" data-demo-pane="accordion" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-accordion default-value='[&quot;two&quot;]'&gt;
+  &lt;details slot=&quot;item&quot; data-value=&quot;one&quot;&gt;
+    &lt;summary&gt;One&lt;/summary&gt;
+    &lt;div&gt;One content&lt;/div&gt;
+  &lt;/details&gt;
+  &lt;details slot=&quot;item&quot; data-value=&quot;two&quot;&gt;
+    &lt;summary&gt;Two&lt;/summary&gt;
+    &lt;div&gt;Two content&lt;/div&gt;
+  &lt;/details&gt;
+&lt;/bwc-accordion&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="accordion" data-testid="demo-accordion-readout">two</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./accordion.html" data-testid="index-accordion-docs" class="underline underline-offset-4 hover:no-underline">View Accordion docs</a></p>
+</section>
+<section aria-label="Modal example" data-testid="index-modal">
+  <h2 class="text-lg font-semibold tracking-tight">Modal</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-modal-meta">bwc-modal · Built JS: 3.5 kB · gzip: 1.6 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">Dialog overlay with modal focus and backdrop dismissal.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-modal-toggle-preview" data-testid="demo-modal-toggle-preview" data-demo-toggle="modal" data-demo-view="preview" aria-pressed="true" aria-controls="demo-modal-preview demo-modal-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-modal-toggle-code" data-testid="demo-modal-toggle-code" data-demo-toggle="modal" data-demo-view="code" aria-pressed="false" aria-controls="demo-modal-preview demo-modal-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-modal-preview" data-testid="demo-modal-preview" data-demo-pane="modal" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-modal id="demo-modal" data-testid="demo-modal" class="flex flex-wrap items-center gap-2">
+  <button slot="trigger" id="demo-modal-trigger" data-testid="demo-modal-trigger" class="min-h-11 cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 dark:active:bg-stone-700">Open dialog</button>
+  <dialog slot="popup" id="demo-modal-popup" data-testid="demo-modal-popup" class="m-auto w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-stone-300 bg-white p-4 text-sm text-stone-900 shadow-lg dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100">
+    <p class="font-medium">Confirm?</p>
+    <p class="mt-1 text-stone-600 dark:text-stone-400">Backdrop click or Escape also closes.</p>
+    <button data-close id="demo-modal-close" data-testid="demo-modal-close" class="min-h-11 cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 dark:active:bg-stone-700 mt-3">Close</button>
+  </dialog>
+</bwc-modal></div>
+  <div id="demo-modal-code" data-testid="demo-modal-code" data-demo-pane="modal" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-modal&gt;
+  &lt;button slot=&quot;trigger&quot;&gt;Open dialog&lt;/button&gt;
+  &lt;dialog slot=&quot;popup&quot;&gt;
+    &lt;p&gt;Confirm?&lt;/p&gt;
+    &lt;p&gt;Backdrop click or Escape also closes.&lt;/p&gt;
+    &lt;button data-close&gt;Close&lt;/button&gt;
+  &lt;/dialog&gt;
+&lt;/bwc-modal&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="modal" data-testid="demo-modal-readout">closed</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./modal.html" data-testid="index-modal-docs" class="underline underline-offset-4 hover:no-underline">View Modal docs</a></p>
+</section>
+<section aria-label="Popover example" data-testid="index-popover">
+  <h2 class="text-lg font-semibold tracking-tight">Popover</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-popover-meta">bwc-popover · Built JS: 4.2 kB · gzip: 1.8 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">Non-modal floating panel on the native popover API.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-popover-toggle-preview" data-testid="demo-popover-toggle-preview" data-demo-toggle="popover" data-demo-view="preview" aria-pressed="true" aria-controls="demo-popover-preview demo-popover-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-popover-toggle-code" data-testid="demo-popover-toggle-code" data-demo-toggle="popover" data-demo-view="code" aria-pressed="false" aria-controls="demo-popover-preview demo-popover-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-popover-preview" data-testid="demo-popover-preview" data-demo-pane="popover" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-popover id="demo-popover" data-testid="demo-popover" side="bottom" side-offset="4" class="flex flex-wrap items-center gap-2">
+  <button slot="trigger" id="demo-popover-trigger" data-testid="demo-popover-trigger" class="min-h-11 cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 dark:active:bg-stone-700">Options</button>
+  <div slot="popup" id="demo-popover-popup" data-testid="demo-popover-popup" class="rounded-md border border-stone-300 bg-white p-3 text-sm shadow-lg dark:border-stone-700 dark:bg-stone-900">
+    <span>Popover content</span>
+    <button data-close id="demo-popover-close" data-testid="demo-popover-close" class="min-h-11 cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 dark:active:bg-stone-700 ml-2">Close</button>
+  </div>
+</bwc-popover></div>
+  <div id="demo-popover-code" data-testid="demo-popover-code" data-demo-pane="popover" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-popover side=&quot;bottom&quot; side-offset=&quot;4&quot;&gt;
+  &lt;button slot=&quot;trigger&quot;&gt;Options&lt;/button&gt;
+  &lt;div slot=&quot;popup&quot;&gt;
+    &lt;span&gt;Popover content&lt;/span&gt;
+    &lt;button data-close&gt;Close&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/bwc-popover&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="popover" data-testid="demo-popover-readout">closed</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./popover.html" data-testid="index-popover-docs" class="underline underline-offset-4 hover:no-underline">View Popover docs</a></p>
+</section>
+<section aria-label="Switch example" data-testid="index-switch">
+  <h2 class="text-lg font-semibold tracking-tight">Switch</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-switch-meta">bwc-switch · Built JS: 3.3 kB · gzip: 1.5 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">On/off toggle with native form participation.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-switch-toggle-preview" data-testid="demo-switch-toggle-preview" data-demo-toggle="switch" data-demo-view="preview" aria-pressed="true" aria-controls="demo-switch-preview demo-switch-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-switch-toggle-code" data-testid="demo-switch-toggle-code" data-demo-toggle="switch" data-demo-view="code" aria-pressed="false" aria-controls="demo-switch-preview demo-switch-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-switch-preview" data-testid="demo-switch-preview" data-demo-pane="switch" data-demo-pane-view="preview" class="p-4 sm:p-5"><div class="flex min-h-11 items-center gap-3 text-sm">
+  <label id="demo-switch-label" data-testid="demo-switch-label" for="demo-switch-button" class="cursor-pointer font-medium select-none">Notifications</label>
+  <bwc-switch id="demo-switch" data-testid="demo-switch" default-checked
+    button-class="flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border border-stone-300 bg-white px-0.5 transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:cursor-not-allowed disabled:opacity-40 data-[checked]:border-emerald-600 data-[checked]:bg-emerald-600 dark:border-stone-600 dark:bg-stone-800"
+    thumb-class="size-5 rounded-full bg-stone-400 transition-transform data-[checked]:translate-x-[22px] data-[checked]:bg-white"
+    input-class=""></bwc-switch>
+</div></div>
+  <div id="demo-switch-code" data-testid="demo-switch-code" data-demo-pane="switch" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;div&gt;
+  &lt;label for=&quot;demo-switch-button&quot;&gt;Notifications&lt;/label&gt;
+  &lt;bwc-switch default-checked&gt;&lt;/bwc-switch&gt;
+&lt;/div&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="switch" data-testid="demo-switch-readout">on</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./switch.html" data-testid="index-switch-docs" class="underline underline-offset-4 hover:no-underline">View Switch docs</a></p>
+</section>
+<section aria-label="OTP example" data-testid="index-otp">
+  <h2 class="text-lg font-semibold tracking-tight">OTP</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-otp-meta">bwc-otp · Built JS: 5.1 kB · gzip: 2.2 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">One-time-code input with generated fields and a hidden form input.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-otp-toggle-preview" data-testid="demo-otp-toggle-preview" data-demo-toggle="otp" data-demo-view="preview" aria-pressed="true" aria-controls="demo-otp-preview demo-otp-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-otp-toggle-code" data-testid="demo-otp-toggle-code" data-demo-toggle="otp" data-demo-view="code" aria-pressed="false" aria-controls="demo-otp-preview demo-otp-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-otp-preview" data-testid="demo-otp-preview" data-demo-pane="otp" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-otp id="demo-otp" data-testid="demo-otp" length="4" validation-type="numeric" name="demo-code"
+  field-class="h-11 w-11 rounded-md border border-stone-300 bg-white text-center font-mono text-lg text-stone-900 outline-none hover:border-stone-400 focus-visible:border-stone-900 focus-visible:ring-2 focus-visible:ring-stone-900/15 disabled:cursor-not-allowed disabled:opacity-40 data-[complete]:border-emerald-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+  hidden-input-class=""
+  class="flex flex-wrap gap-2"></bwc-otp></div>
+  <div id="demo-otp-code" data-testid="demo-otp-code" data-demo-pane="otp" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-otp length=&quot;4&quot; validation-type=&quot;numeric&quot; name=&quot;demo-code&quot;&gt;&lt;/bwc-otp&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="otp" data-testid="demo-otp-readout">—</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./otp.html" data-testid="index-otp-docs" class="underline underline-offset-4 hover:no-underline">View OTP docs</a></p>
+</section>
+<section aria-label="Tabs example" data-testid="index-tabs">
+  <h2 class="text-lg font-semibold tracking-tight">Tabs</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-tabs-meta">bwc-tabs · Built JS: 4.6 kB · gzip: 1.9 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">Tabbed interface with matched panels, one visible at a time.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-tabs-toggle-preview" data-testid="demo-tabs-toggle-preview" data-demo-toggle="tabs" data-demo-view="preview" aria-pressed="true" aria-controls="demo-tabs-preview demo-tabs-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-tabs-toggle-code" data-testid="demo-tabs-toggle-code" data-demo-toggle="tabs" data-demo-view="code" aria-pressed="false" aria-controls="demo-tabs-preview demo-tabs-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-tabs-preview" data-testid="demo-tabs-preview" data-demo-pane="tabs" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-tabs id="demo-tabs" data-testid="demo-tabs" default-value="one" class="grid min-w-0 grid-cols-1 gap-2">
+  <div slot="list" class="flex min-w-0 gap-1 overflow-x-auto border-b border-stone-200 dark:border-stone-800">
+    <button id="demo-tab-one" data-testid="demo-tab-one" value="one" class="min-h-11 cursor-pointer rounded-t border-b-2 border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-stone-500 transition hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 aria-selected:border-emerald-600 aria-selected:font-semibold aria-selected:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-stone-400 dark:hover:text-stone-100 dark:aria-selected:text-stone-100">One</button>
+    <button id="demo-tab-two" data-testid="demo-tab-two" value="two" class="min-h-11 cursor-pointer rounded-t border-b-2 border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-stone-500 transition hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 aria-selected:border-emerald-600 aria-selected:font-semibold aria-selected:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-stone-400 dark:hover:text-stone-100 dark:aria-selected:text-stone-100">Two</button>
+  </div>
+  <section slot="panel" data-value="one" id="demo-tab-panel-one" data-testid="demo-tab-panel-one" class="rounded-md border border-stone-200 p-3 text-sm dark:border-stone-800">One panel</section>
+  <section slot="panel" data-value="two" id="demo-tab-panel-two" data-testid="demo-tab-panel-two" class="rounded-md border border-stone-200 p-3 text-sm dark:border-stone-800">Two panel</section>
+</bwc-tabs></div>
+  <div id="demo-tabs-code" data-testid="demo-tabs-code" data-demo-pane="tabs" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-tabs default-value=&quot;one&quot;&gt;
+  &lt;div slot=&quot;list&quot;&gt;
+    &lt;button value=&quot;one&quot;&gt;One&lt;/button&gt;
+    &lt;button value=&quot;two&quot;&gt;Two&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;section slot=&quot;panel&quot; data-value=&quot;one&quot;&gt;One panel&lt;/section&gt;
+  &lt;section slot=&quot;panel&quot; data-value=&quot;two&quot;&gt;Two panel&lt;/section&gt;
+&lt;/bwc-tabs&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="tabs" data-testid="demo-tabs-readout">one</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./tabs.html" data-testid="index-tabs-docs" class="underline underline-offset-4 hover:no-underline">View Tabs docs</a></p>
+</section>
+<section aria-label="Slide-out example" data-testid="index-slide-out">
+  <h2 class="text-lg font-semibold tracking-tight">Slide-out</h2>
+  <p class="mt-1 font-mono text-xs text-stone-500 dark:text-stone-400" data-testid="index-slide-out-meta">bwc-slide-out · Built JS: 4.2 kB · gzip: 1.9 kB</p>
+  <p class="mt-1 mb-3 text-sm text-stone-600 dark:text-stone-400">Non-modal drawer panel with overlay dismissal and focus management.</p>
+  <section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
+    <div role="group" aria-label="Demo view" class="flex items-center gap-1">
+      <button type="button" id="demo-slide-out-toggle-preview" data-testid="demo-slide-out-toggle-preview" data-demo-toggle="slide-out" data-demo-view="preview" aria-pressed="true" aria-controls="demo-slide-out-preview demo-slide-out-code" class="demo-toggle">Preview</button>
+      <button type="button" id="demo-slide-out-toggle-code" data-testid="demo-slide-out-toggle-code" data-demo-toggle="slide-out" data-demo-view="code" aria-pressed="false" aria-controls="demo-slide-out-preview demo-slide-out-code" class="demo-toggle">Code</button>
+    </div>
+  </div>
+  <div id="demo-slide-out-preview" data-testid="demo-slide-out-preview" data-demo-pane="slide-out" data-demo-pane-view="preview" class="p-4 sm:p-5"><bwc-slide-out id="demo-slide-out" data-testid="demo-slide-out" class="flex flex-wrap items-center gap-2">
+  <button slot="trigger" id="demo-slide-out-trigger" data-testid="demo-slide-out-trigger" class="min-h-11 cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 dark:active:bg-stone-700">Open panel</button>
+  <nav slot="panel" id="demo-slide-out-panel" data-testid="demo-slide-out-panel" class="bg-white p-4 dark:bg-stone-900">
+    <a href="./counter.html" id="demo-slide-out-counter" data-testid="demo-slide-out-counter" class="block rounded-md px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100">Counter</a>
+    <button data-close id="demo-slide-out-close" data-testid="demo-slide-out-close" class="min-h-11 cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 active:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800 dark:active:bg-stone-700 mt-3">Close</button>
+  </nav>
+</bwc-slide-out></div>
+  <div id="demo-slide-out-code" data-testid="demo-slide-out-code" data-demo-pane="slide-out" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden><pre data-language="html"><code class="language-html">&lt;bwc-slide-out&gt;
+  &lt;button slot=&quot;trigger&quot;&gt;Open panel&lt;/button&gt;
+  &lt;nav slot=&quot;panel&quot;&gt;
+    &lt;a href=&quot;./counter.html&quot;&gt;Counter&lt;/a&gt;
+    &lt;button data-close&gt;Close&lt;/button&gt;
+  &lt;/nav&gt;
+&lt;/bwc-slide-out&gt;</code></pre></div>
+  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="slide-out" data-testid="demo-slide-out-readout">closed</span></div>
+</section>
+  <p class="mt-3 text-sm"><a href="./slide-out.html" data-testid="index-slide-out-docs" class="underline underline-offset-4 hover:no-underline">View Slide-out docs</a></p>
+</section></div></main>
+</div>
+<footer class="border-t border-stone-200 dark:border-stone-800">
+  <p class="mx-auto max-w-6xl px-4 py-6 font-mono text-xs text-stone-500 sm:px-6 dark:text-stone-400">basic-web-components docs · <a class="underline underline-offset-2" href="https://github.com/jkelin/base-web-components" data-testid="nav-github-footer">GitHub</a> · <a class="underline underline-offset-2" href="./sitemap.xml" data-testid="nav-sitemap">sitemap.xml</a> · <a class="underline underline-offset-2" href="./llms.txt" data-testid="nav-llms-footer">llms.txt</a></p>
+</footer>
+<script type="module" src="/src/client.tsx"></script>
+<script type="module" src="/src/nav.ts"></script></body>
+</html>

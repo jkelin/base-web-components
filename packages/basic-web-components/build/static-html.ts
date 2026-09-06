@@ -1,5 +1,6 @@
 import * as ts from "typescript";
 import type { Plugin } from "vite";
+import { minifyInlineHtml } from "./minify-inline-assets.ts";
 
 const PUBLIC_MODULE_ID = "virtual:bwc-static-html";
 const RESOLVED_MODULE_ID = `\0${PUBLIC_MODULE_ID}`;
@@ -134,7 +135,7 @@ export function compileStaticHtmlTemplates(source: string, id: string): string |
       replacements.push({
         start: parent.getStart(sourceFile),
         end: parent.end,
-        text: `${BASE_HELPER_NAME}(${JSON.stringify(parent.template.text)})`,
+        text: `${BASE_HELPER_NAME}(${JSON.stringify(minifyInlineHtml(parent.template.text))})`,
       });
       transformedSpecifiers.add(binding.specifier);
     }

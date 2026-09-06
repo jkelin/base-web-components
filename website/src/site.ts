@@ -41,6 +41,29 @@ function formatValue(value: unknown): string {
   if (value === "") return "—";
   return String(value);
 }
+/**
+ * Displayed example source for the docs Code pane: the live demo markup with
+ * the `id`, `data-testid`, `class`, and `*-class` part-class attributes
+ * removed. The live preview keeps the full markup (ids drive readouts/tests,
+ * classes drive styling).
+ *
+ * Edge cases (local to this function):
+ * - Exact `id`/`data-testid`/`class` plus any name ending in `-class`
+ *   (`button-class`/`field-class`/`thumb-class`) are removed; `for`/`side`/
+ *   `side-offset` and substring traps (`classy`, `myclass`) survive because
+ *   the name must equal `class` or end in `-class`.
+ * - Double-quoted, single-quoted, and unquoted values are all removed; Tailwind
+ *   class lists never contain the matching quote, so `[^"]*`/`[^']*` cannot
+ *   overrun into neighboring attributes.
+ * - The leading whitespace is consumed with the attribute, so no double spaces
+ *   or trailing space before `>` remains.
+ */
+export function stripExampleAttributes(html: string): string {
+  return html.replace(
+    /\s+(?:data-testid|id|class|[A-Za-z0-9_-]+-class)="[^"]*"|\s+(?:data-testid|id|class|[A-Za-z0-9_-]+-class)='[^']*'|\s+(?:data-testid|id|class|[A-Za-z0-9_-]+-class)=[^\s"'`>=]+/g,
+    "",
+  );
+}
 
 export const COMPONENTS: Array<ComponentPage> = [
   {

@@ -15,7 +15,6 @@ import {
   type ChangeCallback,
 } from "../shared";
 
-export const BWC_OTP_TAG = "bwc-otp";
 export const BWC_OTP_INPUT_TEST_ID = "bwc-otp-input";
 export const BWC_OTP_HIDDEN_INPUT_TEST_ID = "bwc-otp-hidden-input";
 
@@ -55,7 +54,7 @@ export function normalizeOtpValue(
   return (pattern ? raw.replace(pattern, "") : raw).slice(0, length);
 }
 
-export const BwcOtpElement = defineComponent(BWC_OTP_TAG, () => {
+export const BwcOtpElement = defineComponent("bwc-otp", () => {
   const host = useHost();
   const currentValue = signal("");
   const fieldParts = signal<HTMLInputElement[]>([]);

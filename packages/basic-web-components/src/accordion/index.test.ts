@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BWC_ACCORDION_TAG, BwcAccordionElement } from "./index";
+import { BwcAccordionElement } from "./index";
 
 type AccordionApi = HTMLElement & {
   value: string[];
@@ -29,7 +29,7 @@ function item(value: string, disabled = false): AccordionItem {
 }
 
 function accordion(...items: AccordionItem[]): AccordionApi {
-  const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+  const root = document.createElement("bwc-accordion") as AccordionApi;
   root.append(...items.map(({ details }) => details));
   document.body.append(root);
   return root;
@@ -55,7 +55,7 @@ describe("native accordion", () => {
   it("projects direct details items and initializes the default exactly once", async () => {
     const one = item("one");
     const two = item("two");
-    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    const root = document.createElement("bwc-accordion") as AccordionApi;
     root.defaultValue = ["two"];
     root.append(one.details, two.details);
     document.body.append(root);
@@ -117,7 +117,7 @@ describe("native accordion", () => {
   it("keeps controlled state authoritative and resets when control is removed", async () => {
     const one = item("one");
     const two = item("two");
-    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    const root = document.createElement("bwc-accordion") as AccordionApi;
     root.defaultValue = ["one"];
     root.value = ["two"];
     root.append(one.details, two.details);
@@ -172,7 +172,7 @@ describe("native accordion", () => {
     expect(() => accordion(duplicateOne, duplicateTwo)).toThrow(/unique and nonempty/);
     document.body.replaceChildren();
 
-    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    const root = document.createElement("bwc-accordion") as AccordionApi;
     root.multiple = false;
     expect(() => {
       root.value = ["one", "two"];
@@ -248,7 +248,7 @@ describe("native accordion", () => {
     }
     vi.stubGlobal("MutationObserver", FailingMutationObserver);
     const one = item("one");
-    const root = document.createElement(BWC_ACCORDION_TAG) as AccordionApi;
+    const root = document.createElement("bwc-accordion") as AccordionApi;
     const changes = vi.fn();
     root.onValueChange = changes;
     root.append(one.details);

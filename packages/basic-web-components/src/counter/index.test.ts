@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BWC_COUNTER_TAG, BwcCounterElement, parseCounterValue } from "./index";
+import { BwcCounterElement, parseCounterValue } from "./index";
 
 const MINUS = "bwc-counter-minus-button";
 const LABEL = "bwc-counter-label";
@@ -14,7 +14,7 @@ type CounterElement = HTMLElement & {
 
 function mount(attributes = ""): CounterElement {
   const wrapper = document.createElement("div");
-  wrapper.innerHTML = `<${BWC_COUNTER_TAG}${attributes}>${markup}</${BWC_COUNTER_TAG}>`;
+  wrapper.innerHTML = `<bwc-counter${attributes}>${markup}</bwc-counter>`;
   const host = wrapper.firstElementChild as CounterElement;
   document.body.append(host);
   return host;
@@ -123,7 +123,7 @@ describe("basic web components counter", () => {
     pending.onChange = callback;
     document.body.append(pending);
 
-    const Constructor = customElements.get(BWC_COUNTER_TAG)!;
+    const Constructor = customElements.get("bwc-counter")!;
     customElements.define(tag, class extends (Constructor as typeof BwcCounterElement) {});
 
     expect(pending.defaultValue).toBe(8);
@@ -156,7 +156,7 @@ describe("basic web components counter", () => {
       `<div slot="decrement"></div><output slot="value"></output><button slot="increment"></button>`,
       `<div>${markup}</div>`,
     ]) {
-      const host = document.createElement(BWC_COUNTER_TAG);
+      const host = document.createElement("bwc-counter");
       host.innerHTML = content;
       expect(() => document.body.append(host)).toThrow(TypeError);
       host.remove();

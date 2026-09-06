@@ -12,14 +12,13 @@ import {
   type ChangeCallback,
 } from "../shared";
 
-export const BWC_SWITCH_TAG = "bwc-switch";
 export const BWC_SWITCH_BUTTON_TEST_ID = "bwc-switch-button";
 export const BWC_SWITCH_THUMB_TEST_ID = "bwc-switch-thumb";
 export const BWC_SWITCH_INPUT_TEST_ID = "bwc-switch-input";
 
 type ClassController = (partClass?: string | null) => void;
 
-export const BwcSwitchElement = defineComponent(BWC_SWITCH_TAG, () => {
+export const BwcSwitchElement = defineComponent("bwc-switch", () => {
   const host = useHost();
   const checked = signal(false);
   let controlled = host.hasAttribute("checked");
@@ -99,7 +98,7 @@ export const BwcSwitchElement = defineComponent(BWC_SWITCH_TAG, () => {
   const change = () => requestChecked(input.checked);
 
   onMount(() => {
-    host.id ||= nextId(BWC_SWITCH_TAG);
+    host.id ||= nextId("bwc-switch");
     button.id ||= `${host.id}-button`;
     button.style.userSelect = "none";
     thumb.style.userSelect = "none";

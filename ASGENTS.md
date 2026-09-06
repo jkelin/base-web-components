@@ -94,3 +94,9 @@ No CDN in the repo: smoke CSS is local.
 - Tailwind utilities live in markup `class` and part-class attributes
   (`button-class`, `field-class`, …); the scanner reads both. `style.css`
   keeps only what Tailwind cannot express (dialog `::backdrop`).
+
+## Website
+
+- Shell UI icons are Phosphor icons (https://phosphoricons.com), duotone
+  weight, inlined as SVG from `website/src/icons.ts` (official duotone
+  paths, no emoji). Reuse that module for new shell icons; never add emoji icons.

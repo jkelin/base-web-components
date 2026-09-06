@@ -19,7 +19,6 @@ import {
   type ChangeCallback,
 } from "../shared";
 
-export const BWC_COUNTER_TAG = "bwc-counter";
 const DECREMENT_TEST_ID = "bwc-counter-minus-button";
 const OUTPUT_TEST_ID = "bwc-counter-label";
 const INCREMENT_TEST_ID = "bwc-counter-plus-button";
@@ -49,7 +48,7 @@ const counterValueCodec = {
   toAttribute: String,
 };
 
-export const BwcCounterElement = defineComponent<CounterApi>(BWC_COUNTER_TAG, () => {
+export const BwcCounterElement = defineComponent<CounterApi>("bwc-counter", () => {
   const host = useHost<CounterApi>();
   const state: CounterState = {
     controlled: false,

@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BWC_MODAL_TAG, type BwcModalElement } from "./index";
+import { type BwcModalElement } from "./index";
+// Side-effect import: registering `bwc-modal` happens on module load.
+import "./index";
 
 type ModalElement = BwcModalElement;
 
 function createModal(options: { defaultOpen?: boolean; open?: boolean } = {}) {
-  const root = document.createElement(BWC_MODAL_TAG) as ModalElement;
+  const root = document.createElement("bwc-modal") as ModalElement;
   root.toggleAttribute("default-open", options.defaultOpen ?? false);
   root.toggleAttribute("open", options.open ?? false);
 
@@ -29,7 +31,7 @@ afterEach(() => {
 
 describe("native slot structure", () => {
   it("requires one button trigger and one dialog popup", () => {
-    const root = document.createElement(BWC_MODAL_TAG);
+    const root = document.createElement("bwc-modal");
     const trigger = document.createElement("div");
     trigger.slot = "trigger";
     const popup = document.createElement("dialog");

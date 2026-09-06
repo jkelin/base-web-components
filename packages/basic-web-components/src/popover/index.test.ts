@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BWC_POPOVER_TAG, type BwcPopoverElement } from "./index";
+import { type BwcPopoverElement } from "./index";
+// Side-effect import: registering `bwc-popover` happens on module load.
+import "./index";
 
 type PopoverElement = BwcPopoverElement;
 
 function createPopover(options: { defaultOpen?: boolean; open?: boolean } = {}) {
-  const root = document.createElement(BWC_POPOVER_TAG) as PopoverElement;
+  const root = document.createElement("bwc-popover") as PopoverElement;
   root.toggleAttribute("default-open", options.defaultOpen ?? false);
   root.toggleAttribute("open", options.open ?? false);
 
@@ -26,7 +28,7 @@ afterEach(() => document.body.replaceChildren());
 
 describe("native slot structure", () => {
   it("requires one button trigger and one div popup", () => {
-    const root = document.createElement(BWC_POPOVER_TAG);
+    const root = document.createElement("bwc-popover");
     const trigger = document.createElement("button");
     trigger.slot = "trigger";
     const first = document.createElement("div");

@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { minifyInlineAssets } from "./build/minify-inline-assets.ts";
 import { staticHtmlPlugin } from "./build/static-html.ts";
 
 const entries = {
@@ -13,7 +14,7 @@ const entries = {
 };
 
 export default defineConfig({
-  plugins: [staticHtmlPlugin()],
+  plugins: [minifyInlineAssets(), staticHtmlPlugin()],
   // `source` + `development` first so the shared microfw/alien runtime resolves
   // to TypeScript source and bundles exactly once into shared.js.
   resolve: {

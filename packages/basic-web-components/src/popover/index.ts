@@ -25,8 +25,6 @@ if (typeof document !== "undefined" && !document.getElementById("bwc-popover-sty
   document.head.append(style);
 }
 
-export const BWC_POPOVER_TAG = "bwc-popover";
-
 const sides = ["top", "right", "bottom", "left"] as const;
 type Side = (typeof sides)[number];
 
@@ -42,7 +40,7 @@ export type BwcPopoverElement = HTMLElement & {
   onOpenChange: ChangeCallback<boolean>;
 };
 
-export const BwcPopoverElement = defineComponent<BwcPopoverElement>(BWC_POPOVER_TAG, () => {
+export const BwcPopoverElement = defineComponent<BwcPopoverElement>("bwc-popover", () => {
   const host = useHost<BwcPopoverElement>();
   let controlled = host.hasAttribute("open") || Object.hasOwn(host, "open");
   const openState = signal(false);

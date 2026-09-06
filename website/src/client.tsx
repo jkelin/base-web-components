@@ -1,5 +1,7 @@
 import { createSignal } from "solid-js";
 import { render } from "@solidjs/web";
+import "microlighter/themes/github.css";
+import { highlightAll } from "microlighter";
 import "./styles.css";
 
 // Real custom elements by package subpath (never dist paths); importing
@@ -77,12 +79,65 @@ function mountReadouts(): void {
     render(() => <>{text()}</>, mount);
   }
 }
+// Client-side syntax highlighting (microlighter over the CSS Custom Highlight
+// API): prerendered pages carry raw escaped code, highlighted here on load and
+// after each SPA swap. `diff` has no bundled grammar under that name, so alias
+// it to git-diff; unknown languages (e.g. `text`) and browsers without the
+// Highlights API keep the plain readable source.
+// Tables carry inline `<code>` with no language class (marked codespans), so
+// tag untagged `.doc table code` per column: in tables whose header has an
+// "Attribute" column (API properties tables, matched case-insensitively at
+// any position), code in that body column holds HTML attribute names
+// (`value`, `default-value`, `data-close`), so tag it `language-html`; every
+// other untagged table code cell (types, literals, event names, element
+// names) stays `language-ts`. Tables without an Attribute header (events,
+// slots) are all-ts as before. Already-tagged code keeps its language.
+async function highlightCodeBlocks(): Promise<void> {
+  try {
+    if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
+    for (const table of document.querySelectorAll(".doc table")) {
+      const headerCells = table.querySelectorAll("thead tr th");
+      const headers =
+        headerCells.length > 0
+          ? [...headerCells]
+          : [...table.querySelectorAll("tr:first-child th, tr:first-child td")];
+      const attrIndex = headers.findIndex(
+        (th) => th.textContent?.trim().toLowerCase() === "attribute",
+      );
+      const rows = table.querySelectorAll("tbody tr");
+      const bodyRows = rows.length > 0 ? [...rows] : [...table.querySelectorAll("tr")].slice(1);
+      for (const row of bodyRows) {
+        const cells = row.querySelectorAll("td, th");
+        cells.forEach((cell, index) => {
+          const lang = index === attrIndex ? "language-html" : "language-ts";
+          for (const el of cell.querySelectorAll('code:not([class*="language-"])')) {
+            el.classList.add(lang);
+          }
+        });
+      }
+      // Headerless/layout tables: fall back to all-ts tagging.
+      if (bodyRows.length === 0) {
+        for (const el of table.querySelectorAll('code:not([class*="language-"])')) {
+          el.classList.add("language-ts");
+        }
+      }
+    }
+    await highlightAll({
+      selector: "pre > code, .doc table code",
+      languageAliases: { diff: "git-diff" },
+    });
+  } catch {
+    // Plain-text fallback: the escaped source stays readable.
+  }
+}
 
 mountDemoToggles();
 mountReadouts();
+void highlightCodeBlocks();
 // SPA router contract (see src/nav.ts): after each content swap the router
 // dispatches `bwc:page-swapped`; remount islands onto the fresh nodes.
 document.addEventListener("bwc:page-swapped", () => {
   mountDemoToggles();
   mountReadouts();
+  void highlightCodeBlocks();
 });
