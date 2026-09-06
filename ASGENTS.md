@@ -62,6 +62,10 @@ No CDN in the repo: smoke CSS is local.
   (native-minified ES modules, ES2022) plus one `shared.js` chunk carrying
   shared helpers and the single microfw/alien runtime copy.
   `sideEffects` preserves self-registration.
+- Build-only lowering: `build/static-html.ts` (`staticHtmlPlugin`, apply
+  build) compiles static `html` templates to a virtual `staticHtml` helper;
+  anything dynamic stays on the runtime path unchanged. Re-check the pinned
+  TS-internal invalid-escape flag value on TypeScript upgrades.
 
 ## Smoke imports
 

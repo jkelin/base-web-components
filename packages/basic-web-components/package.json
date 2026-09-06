@@ -78,8 +78,8 @@
     "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint src",
-    "format": "oxfmt --write src"
+    "lint": "oxlint src build vite.config.ts vitest.config.ts",
+    "format": "oxfmt --write src build vite.config.ts vitest.config.ts"
   },
   "dependencies": {
     "microfw": "workspace:*"

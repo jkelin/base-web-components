@@ -58,6 +58,20 @@ bun run test
 bun run build
 ```
 
+## Build optimization
+
+Static `html` templates are lowered at build (`build/static-html.ts`,
+`staticHtmlPlugin`, build only) to a `staticHtml("...")` helper from a
+virtual module; dynamic, non-tag, re-exported, `eval`, colliding, and
+invalid-escape uses stay on the full runtime path unchanged. BWC total
+35,675 / 14,653 / 12,989 raw/gzip-9/brotli-11 (was 38,340 / 15,680 /
+13,917); standalone `microfw.js` is unchanged. Cost is build-only (~300 ms
+extra BWC build time, no new dependencies, no public behavior/API change —
+compiled output changes). Maintenance:
+one TS-internal AST flag (the `templateFlags` invalid-escape bit) pinned by
+the invalid-escape consumer regression — re-check its value on TS upgrades
+(see `optimization-size-report.md`).
+
 ## Smoke
 
 `smoke/` is a Vite project that imports all seven entries by package name and

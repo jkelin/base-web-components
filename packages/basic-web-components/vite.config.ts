@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { staticHtmlPlugin } from "./build/static-html.ts";
 
 const entries = {
   counter: "src/counter/index.ts",
@@ -11,6 +12,7 @@ const entries = {
 };
 
 export default defineConfig({
+  plugins: [staticHtmlPlugin()],
   // `source` + `development` first so the shared microfw/alien runtime resolves
   // to TypeScript source and bundles exactly once into shared.js.
   resolve: {
@@ -28,6 +30,7 @@ export default defineConfig({
         manualChunks(id: string) {
           if (
             id.includes("/src/shared/") ||
+            id.includes("virtual:bwc-static-html") ||
             id.includes("packages/microfw/") ||
             id.includes("node_modules")
           )
