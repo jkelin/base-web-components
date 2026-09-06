@@ -18,8 +18,8 @@ import type { Plugin } from "vite";
 import { COMPONENTS, stripExampleAttributes } from "./site.ts";
 import { phosphorIcon } from "./icons.ts";
 
-const SITE_BASE = "https://jkelin.github.io/base-web-components/";
-const GITHUB_URL = "https://github.com/jkelin/base-web-components";
+const SITE_BASE = "https://jkelin.github.io/basic-web-components/";
+const GITHUB_URL = "https://github.com/jkelin/basic-web-components";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LIB = resolve(ROOT, "..", "packages", "basic-web-components", "src");
