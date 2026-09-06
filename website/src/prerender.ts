@@ -88,6 +88,33 @@ async function loadDoc(
   }
 }
 
+const STYLING_BLURB =
+  "Styling basic-web-components: the optional variable-driven default CSS or Tailwind and direct styling, with a live configurator.";
+
+async function loadGuideDoc(): Promise<DocSource> {
+  try {
+    const markdown = await readFile(join(ROOT, "..", "docs", "styling.md"), "utf8");
+    const paragraph = firstParagraph(markdown);
+    return {
+      slug: "styling",
+      markdown,
+      title: "Styling",
+      description: paragraph?.replace(/\s+/g, " ") ?? STYLING_BLURB,
+      fromReadme: false,
+    };
+  } catch {
+    // Missing guide: stub from the styling contract, never block the build.
+    const markdown = `# Styling\n\n${STYLING_BLURB}\n\n\`\`\`css\n@import "basic-web-components/theme.css";\n\`\`\`\n`;
+    return {
+      slug: "styling",
+      markdown,
+      title: "Styling",
+      description: STYLING_BLURB,
+      fromReadme: false,
+    };
+  }
+}
+
 // Raw code blocks for client-side highlighting: prerender emits the escaped
 // source with a `language-*` class (plus data-language for microlighter's
 // fallback lookup); src/client.tsx runs microlighter's highlightAll() on load
@@ -123,7 +150,7 @@ function wrapTables(html: string): string {
     .replaceAll("</table>", "</table></div>");
 }
 
-const THEME_INIT = `<script>(function(){try{var t=localStorage.getItem("bwc-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark");}}catch(e){}})();</script>`;
+const THEME_INIT = `<script>(function(){try{var t=localStorage.getItem("bwc-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark");}}catch(e){}try{var v=localStorage.getItem("bwc-theme-vars");if(v){var o=JSON.parse(v);for(var k in o){document.documentElement.style.setProperty(k,o[k]);}}}catch(e){}})();</script>`;
 
 // Critical shell styles, inline before paint: page background (no white
 // flash in dark mode), pre-upgrade slide-out hiding, responsive
@@ -131,6 +158,18 @@ const THEME_INIT = `<script>(function(){try{var t=localStorage.getItem("bwc-them
 // else arrives via Tailwind; noscript keeps the sidebar usable.
 const CRITICAL_CSS = `<style>html{background-color:#fafaf9}html.dark{background-color:#0c0a09}#main{transition:opacity 100ms ease-out}@media (prefers-reduced-motion:reduce){#main{transition:none}}bwc-slide-out:not(:defined)>[slot="panel"]{display:none}@media (max-width:1023.5px){#sidebar{display:none}}@media (min-width:1024px){#site-menu{display:none}}</style>`;
 const NOSCRIPT_CSS = `<noscript><style>#sidebar{display:block !important}#site-menu{display:none !important}</style></noscript>`;
+// Site logo: white lowercase `bwc` monospace wordmark on a black rounded
+// rect. Hand-authored (rect + text only, no editor metadata) so it stays
+// tiny; the generic monospace stack renders without webfonts. HEADER_LOGO_SVG
+// renders the wordmark inline (no extra request) at ~28px tall to match the
+// header. FAVICON_SVG is a separate tight square asset (single `b`, ~19%
+// padding per side) emitted as favicon.svg.
+const LOGO_VIEWBOX = "0 0 41 28";
+const LOGO_INNER = `<rect width="41" height="28" rx="6" fill="#000"/><text x="20.5" y="14" dy="0.35em" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" font-weight="700" fill="#fff">bwc</text>`;
+const FAVICON_VIEWBOX = "0 0 64 64";
+const FAVICON_INNER = `<rect width="64" height="64" rx="13" fill="#000"/><text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="40" font-weight="700" fill="#fff">b</text>`;
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${FAVICON_VIEWBOX}">${FAVICON_INNER}</svg>`;
+const HEADER_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOGO_VIEWBOX}" aria-hidden="true" data-testid="nav-logo" class="h-7 w-auto dark:invert">${LOGO_INNER}</svg>`;
 
 function sidebar(active: string): string {
   const link = (href: string, label: string, current: boolean, mono = false) =>
@@ -147,24 +186,27 @@ function sidebar(active: string): string {
   <p class="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Overview</p>
   <ul class="mt-2 space-y-0.5">
     ${link("./", "Overview", active === "index")}
+    ${link("./styling.html", "Styling", active === "styling")}
   </ul>
   <p class="mt-6 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Components</p>
   <ul class="mt-2 space-y-0.5">
     ${items}
   </ul>
-</nav>`;
+  </nav>`;
 }
 
 // Mobile menu panel: the same prerendered links as the desktop sidebar, so
 // navigation works with and without JS (no-JS readers use the noscript
-// sidebar instead; the hamburger trigger is inert until upgrade).
+// sidebar instead; the hamburger trigger is inert until upgrade). Shell
+// parts (trigger, panel, close) carry `data-bwc-unstyled` so theme.css
+// leaves the shell's Tailwind styling alone while demos stay themed.
 function mobileMenu(active: string): string {
   return `<bwc-slide-out id="site-menu" data-testid="site-menu" class="lg:hidden">
-  <button slot="trigger" id="menu-button" data-testid="menu-button" type="button" aria-label="Open menu" class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-stone-800">${phosphorIcon("menu", 16)}</button>
-  <div slot="panel" id="menu-panel" data-testid="menu-panel" class="overflow-y-auto bg-white p-4 dark:bg-stone-900">
+  <button slot="trigger" data-bwc-unstyled id="menu-button" data-testid="menu-button" type="button" aria-label="Open menu" class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-stone-800">${phosphorIcon("menu", 16)}</button>
+  <div slot="panel" data-bwc-unstyled id="menu-panel" data-testid="menu-panel" class="overflow-y-auto bg-white p-4 dark:bg-stone-900">
     <div class="mb-3 flex items-center justify-between gap-2">
       <span class="font-mono text-sm font-semibold">basic-web-components</span>
-      <button data-close id="menu-close" data-testid="menu-close" type="button" aria-label="Close menu" class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-stone-300 px-2 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:hover:bg-stone-800">${phosphorIcon("x", 20)}</button>
+      <button data-close data-bwc-unstyled id="menu-close" data-testid="menu-close" type="button" aria-label="Close menu" class="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-stone-300 px-2 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:hover:bg-stone-800">${phosphorIcon("x", 20)}</button>
     </div>
     ${sidebar(active)}
   </div>
@@ -194,6 +236,10 @@ function shell(options: {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="${escapeHtml(options.description)}" />
 <link rel="canonical" href="${canonical}" />
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="basic-web-components" />
 <meta property="og:title" content="${escapeHtml(fullTitle)}" />
@@ -212,7 +258,7 @@ ${NOSCRIPT_CSS}
   <div aria-hidden="true" data-testid="header-blur" class="pointer-events-none absolute inset-0 backdrop-blur-md"></div>
   <div class="relative mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
     <a href="./" data-testid="nav-home" class="flex min-w-0 items-center gap-2">
-      <span aria-hidden="true" class="flex size-7 items-center justify-center rounded-md bg-stone-900 font-mono text-sm font-bold text-white dark:bg-stone-100 dark:text-stone-900">b</span>
+      ${HEADER_LOGO_SVG}
       <span data-testid="nav-wordmark" class="hidden truncate font-mono text-sm font-semibold sm:block">basic-web-components</span>
     </a>
     <div class="flex items-center gap-2">
@@ -220,6 +266,10 @@ ${NOSCRIPT_CSS}
       <a href="./llms.txt" data-testid="nav-llms" target="_blank" rel="noopener" class="hidden rounded-md px-2 py-1 font-mono text-xs text-stone-500 hover:text-stone-900 sm:block dark:text-stone-400 dark:hover:text-stone-100">llms.txt</a>
       <a id="nav-github" href="${GITHUB_URL}" data-testid="nav-github" aria-label="GitHub repository" title="GitHub repository" target="_blank" rel="noopener noreferrer" class="flex size-7 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100">${phosphorIcon("github", 16)}</a>
       <div id="theme-toggle-mount" data-testid="theme-toggle-mount"></div>
+      <bwc-popover id="styling-popover" data-testid="styling-popover" side="bottom" side-offset="4" class="flex items-center">
+        <button slot="trigger" data-bwc-unstyled id="styling-trigger" data-testid="styling-trigger" type="button" aria-label="Customize theme" title="Customize theme" class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100">${phosphorIcon("paintRoller", 16)}</button>
+        <div slot="popup" data-bwc-unstyled id="styling-popup" data-testid="styling-popup" class="w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-stone-300 bg-white p-4 shadow-lg dark:border-stone-700 dark:bg-stone-900"><div id="styling-popover-mount" data-testid="styling-popover-mount"></div></div>
+      </bwc-popover>
       ${mobileMenu(options.active)}
     </div>
   </div>
@@ -229,7 +279,7 @@ ${NOSCRIPT_CSS}
   <main id="main" data-page="${options.active}" class="min-w-0">${options.main}</main>
 </div>
 <footer class="border-t border-stone-200 dark:border-stone-800">
-  <p class="mx-auto max-w-6xl px-4 py-6 font-mono text-xs text-stone-500 sm:px-6 dark:text-stone-400">basic-web-components docs · <a class="underline underline-offset-2" href="${GITHUB_URL}" data-testid="nav-github-footer" target="_blank" rel="noopener noreferrer">GitHub</a> · <a class="underline underline-offset-2" href="./sitemap.xml" data-testid="nav-sitemap" target="_blank" rel="noopener">sitemap.xml</a> · <a class="underline underline-offset-2" href="./llms.txt" data-testid="nav-llms-footer" target="_blank" rel="noopener">llms.txt</a></p>
+  <div class="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 font-mono text-xs text-stone-500 sm:px-6 dark:text-stone-400"><p>basic-web-components docs · <a class="underline underline-offset-2" href="${GITHUB_URL}" data-testid="nav-github-footer" target="_blank" rel="noopener noreferrer">GitHub</a> · <a class="underline underline-offset-2" href="./sitemap.xml" data-testid="nav-sitemap" target="_blank" rel="noopener">sitemap.xml</a> · <a class="underline underline-offset-2" href="./llms.txt" data-testid="nav-llms-footer" target="_blank" rel="noopener">llms.txt</a></p><p><a class="underline underline-offset-2" href="https://fonts.google.com/specimen/IBM+Plex+Mono" data-testid="nav-font-footer" target="_blank" rel="noopener noreferrer">IBM Plex Mono</a> · <a class="underline underline-offset-2" href="https://fonts.google.com/specimen/Manrope" data-testid="nav-manrope-footer" target="_blank" rel="noopener noreferrer">Manrope</a> · <a class="underline underline-offset-2" href="https://phosphoricons.com" data-testid="nav-phosphor-footer" target="_blank" rel="noopener noreferrer">Phosphor icons</a> · <a class="underline underline-offset-2" href="https://github.com/stackblitz/alien-signals" data-testid="nav-alien-signals-footer" target="_blank" rel="noopener noreferrer">Alien Signals</a></p></div>
 </footer>
 ${options.scripts}</body>
 </html>
@@ -307,11 +357,13 @@ function buildLlmsTxt(docs: Array<DocSource>): string {
       (doc) =>
         `- [${doc.title}](./${doc.slug}.html): ${doc.description} Markdown: ./${doc.slug}.md`,
     ),
+    "- [Styling](./styling.html): optional variable-driven default CSS or Tailwind and direct styling, with a live configurator. Markdown: ./styling.md",
     "",
     "## Markdown sources",
     "",
     "- [Overview markdown](./index.md)",
     ...docs.map((doc) => `- [${doc.title} markdown](./${doc.slug}.md)`),
+    "- [Styling markdown](./styling.md)",
     "",
   ];
   return lines.join("\n");
@@ -330,6 +382,10 @@ function indexMarkdown(docs: Array<DocSource>): string {
       (doc) =>
         `- [${doc.title}](./${doc.slug}.html) ([markdown](./${doc.slug}.md)): ${doc.description}`,
     ),
+    "",
+    "## Guides",
+    "",
+    "- [Styling](./styling.html) ([markdown](./styling.md)): optional variable-driven default CSS or Tailwind and direct styling, with a live configurator.",
     "",
   ];
   return lines.join("\n");
@@ -430,6 +486,36 @@ async function generateSite(): Promise<GeneratedSite> {
     texts.set(`${component.slug}.md`, doc.markdown);
   }
 
+  // Styling guide: same markdown pipeline as component pages, sourced from
+  // the repo-root docs/ copy (also emitted as styling.md + docs/styling.md
+  // so the header markdown link keeps working).
+  const stylingDoc = await loadGuideDoc();
+  marked.use({ renderer: createRenderer() });
+  const stylingHtml = wrapTables(marked.parse(stylingDoc.markdown, { async: false }));
+  marked.use({ renderer: null });
+  const configuratorSection = `<section aria-label="Theme configurator" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+  <div class="border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
+    <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Configurator</p>
+  </div>
+  <div class="p-4 sm:p-5"><div id="styling-configurator-mount" data-testid="styling-configurator-mount"></div></div>
+</section>`;
+  // Configurator sits below Option 1: split the article at the Option 2
+  // heading so the variable-theme docs read first. Falls back to the
+  // configurator-first layout when the heading is missing.
+  const option2At = stylingHtml.search(/<h2[^>]*>(?:(?!<h2)[\s\S])*?Option 2/);
+  const stylingMain =
+    option2At >= 0
+      ? `<article class="doc mt-8" data-syntax-theme="github" data-testid="doc-styling">${stylingHtml.slice(0, option2At)}</article>${configuratorSection}<article class="doc mt-8" data-syntax-theme="github" data-testid="doc-styling-option-2">${stylingHtml.slice(option2At)}</article>`
+      : `${configuratorSection}<article class="doc mt-8" data-syntax-theme="github" data-testid="doc-styling">${stylingHtml}</article>`;
+  pages.set("styling.html", {
+    title: stylingDoc.title,
+    description: stylingDoc.description,
+    active: "styling",
+    main: stylingMain,
+  });
+  texts.set("docs/styling.md", stylingDoc.markdown);
+  texts.set("styling.md", stylingDoc.markdown);
+
   pages.set("index.html", {
     title: "Overview",
     description:
@@ -439,6 +525,7 @@ async function generateSite(): Promise<GeneratedSite> {
   });
   texts.set("index.md", indexMarkdown(docs));
   texts.set("sitemap.xml", sitemapXml(pages.keys()));
+  texts.set("favicon.svg", `${FAVICON_SVG}\n`);
   texts.set("llms.txt", buildLlmsTxt(docs));
   return { pages, texts };
 }
@@ -507,7 +594,9 @@ export function docsPrerender(): Plugin {
                 ? MARKDOWN_TYPE
                 : textKey.endsWith(".xml")
                   ? "application/xml; charset=utf-8"
-                  : "text/plain; charset=utf-8",
+                  : textKey.endsWith(".svg")
+                    ? "image/svg+xml"
+                    : "text/plain; charset=utf-8",
             );
             res.end(text);
             return;
