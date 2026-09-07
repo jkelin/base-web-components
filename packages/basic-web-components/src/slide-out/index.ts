@@ -36,6 +36,12 @@ export type BwcSlideOutElement = HTMLElement & {
   panelClass: string;
   closeClass: string;
   onOpenChange: ChangeCallback<boolean>;
+  /** Imperative open. Respects `disabled`; applies and notifies in controlled mode. */
+  show: () => void;
+  /** Imperative close. Applies and notifies in controlled mode. */
+  close: () => void;
+  /** Toggle, or force with a boolean. Applies and notifies in controlled mode. */
+  toggle: (force?: boolean) => void;
 };
 
 const FOCUSABLE =
@@ -65,6 +71,7 @@ export const BwcSlideOutElement = defineComponent<BwcSlideOutElement>("bwc-slide
     get: () => openState(),
     onSet: (value, commit) => {
       controlled = true;
+      if (initialized) requestOpen(value, true);
       commit(value);
     },
   });
@@ -118,10 +125,10 @@ export const BwcSlideOutElement = defineComponent<BwcSlideOutElement>("bwc-slide
     restoreFocus = null;
   };
 
-  const requestOpen = (next: boolean) => {
-    if (disabled() || next === openState()) return;
+  const requestOpen = (next: boolean, force = false) => {
+    if ((!force && disabled()) || next === openState()) return;
     emit(host, onOpenChange(), "open-change", "open", next);
-    if (controlled) return;
+    if (controlled && !force) return;
 
     try {
       openState(next);
@@ -129,6 +136,17 @@ export const BwcSlideOutElement = defineComponent<BwcSlideOutElement>("bwc-slide
       openState(!next);
       throw error;
     }
+  };
+
+  host.show = () => {
+    if (!disabled()) requestOpen(true, true);
+  };
+  host.close = () => {
+    if (!disabled()) requestOpen(false, true);
+  };
+  host.toggle = (force?: boolean) => {
+    if (disabled()) return;
+    requestOpen(typeof force === "boolean" ? force : !openState(), true);
   };
 
   onMount(() => {

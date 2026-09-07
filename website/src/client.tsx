@@ -5,15 +5,6 @@ import { highlightAll } from "microlighter";
 import "basic-web-components/theme.css";
 import "./styles.css";
 
-// Real custom elements by package subpath (never dist paths); importing
-// registers them so the prerendered demo markup upgrades on load.
-import "basic-web-components/accordion";
-import "basic-web-components/modal";
-import "basic-web-components/popover";
-import "basic-web-components/switch";
-import "basic-web-components/otp";
-import "basic-web-components/tabs";
-
 import { COMPONENTS } from "./site";
 import { mountStylingIslands } from "./styling";
 import { ThemeToggle } from "./theme";
@@ -63,19 +54,31 @@ function mountDemoToggles(): void {
 const boundReadouts = new WeakSet<Element>();
 function mountReadouts(): void {
   for (const component of COMPONENTS) {
+    const eventName = component.readoutEvent;
+    const readoutKey = component.readoutKey;
+    const readoutInitial = component.readoutInitial;
+    const formatReadout = component.formatReadout;
+    if (!eventName || !readoutKey || readoutInitial === undefined || !formatReadout) continue;
     const mount = document.querySelector(`[data-readout="${component.slug}"]`);
     const demo = document.getElementById(`demo-${component.slug}`);
-    if (!mount || !demo || boundReadouts.has(mount)) {
-      continue;
-    }
+    if (!mount || !demo || boundReadouts.has(mount)) continue;
     boundReadouts.add(mount);
-    const [text, setText] = createSignal(component.readoutInitial);
-    demo.addEventListener(component.readoutEvent, (event) => {
+    const [text, setText] = createSignal(readoutInitial);
+    demo.addEventListener(eventName, (event) => {
       const detail = (event as CustomEvent).detail as Record<string, unknown> | undefined;
-      setText(component.formatReadout(detail?.[component.readoutKey]));
+      setText(formatReadout(detail?.[readoutKey]));
     });
-    // `render` appends: drop the prerendered fallback text first so the island
-    // owns the node (no-JS readers still see the prerendered value).
+    if (component.slug === "toast") {
+      const syncOpenToast = (): void => {
+        const hasOpenToast = [
+          ...demo.querySelectorAll<HTMLElement & { open: boolean }>("bwc-toast"),
+        ].some((toast) => toast.open);
+        if (hasOpenToast) setText(component.formatReadout?.(true) ?? "");
+      };
+      const observer = new MutationObserver(syncOpenToast);
+      observer.observe(demo, { childList: true });
+      void customElements.whenDefined("bwc-toast").then(syncOpenToast);
+    }
     mount.textContent = "";
     render(() => <>{text()}</>, mount);
   }
@@ -134,6 +137,26 @@ async function highlightCodeBlocks(): Promise<void> {
 
 mountDemoToggles();
 mountReadouts();
+// Bind readouts before custom-element registration: upgrade can emit the
+// initial event (notably `showToast()` children), and listeners must see it.
+await Promise.all([
+  import("basic-web-components/accordion"),
+  import("basic-web-components/modal"),
+  import("basic-web-components/popover"),
+  import("basic-web-components/tooltip"),
+  import("basic-web-components/preview-card"),
+  import("basic-web-components/menu"),
+  import("basic-web-components/context-menu"),
+  import("basic-web-components/select"),
+  import("basic-web-components/switch"),
+  import("basic-web-components/otp"),
+  import("basic-web-components/tabs"),
+  import("basic-web-components/slide-out"),
+  import("basic-web-components/alert-dialog"),
+  import("basic-web-components/toast"),
+  import("basic-web-components/menubar"),
+  import("basic-web-components/navigation-menu"),
+]);
 mountStylingIslands();
 void highlightCodeBlocks();
 // SPA router contract (see src/nav.ts): after each content swap the router

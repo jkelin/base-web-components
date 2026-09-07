@@ -1,0 +1,13 @@
+/*
+ * Styling for bwc-menubar (a row of bwc-menu elements).
+ *
+ * The bar itself is just a flex row; each child menu positions its own
+ * popup through the shared floating core (see ../floating/ and
+ * ../menu/menu.css), so this file only lays out the triggers.
+ */
+
+bwc-menubar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}

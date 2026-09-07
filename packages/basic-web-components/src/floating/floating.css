@@ -1,0 +1,41 @@
+/*
+ * Shared reset and triangle arrow for JS-positioned floating surfaces.
+ * JavaScript writes geometry plus `data-side`; components only opt their
+ * arrow into this treatment with `data-floating-arrow`.
+ */
+
+[data-floating] {
+  inset: auto;
+  margin: 0;
+}
+
+[data-floating-arrow] {
+  --floating-arrow-edge: calc(-1 * var(--floating-arrow-size, 8px) + 1px);
+  position: absolute;
+  z-index: 0;
+  width: var(--floating-arrow-size, 8px);
+  height: var(--floating-arrow-size, 8px);
+  margin: 0;
+  background: inherit;
+  border: 0;
+}
+
+[data-floating][data-side="bottom"] [data-floating-arrow] {
+  top: var(--floating-arrow-edge);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+[data-floating][data-side="top"] [data-floating-arrow] {
+  bottom: var(--floating-arrow-edge);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+[data-floating][data-side="right"] [data-floating-arrow] {
+  left: var(--floating-arrow-edge);
+  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+}
+
+[data-floating][data-side="left"] [data-floating-arrow] {
+  right: var(--floating-arrow-edge);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}

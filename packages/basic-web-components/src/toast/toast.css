@@ -1,0 +1,59 @@
+/*
+ * Styling for bwc-toast-region (viewport) and bwc-toast items.
+ *
+ * The region is a fixed viewport; its position comes from `data-position`.
+ * Toasts stack in DOM order with a small gap. Toasts beyond the region's
+ * `limit` carry `data-limited` and are hidden until a slot frees up.
+ */
+
+bwc-toast-region {
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: calc(100vw - 2rem);
+  max-width: 22.5rem;
+  margin: 0;
+}
+
+bwc-toast-region[data-position="top-left"] {
+  top: 1rem;
+  left: 1rem;
+}
+
+bwc-toast-region[data-position="top-center"] {
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+bwc-toast-region[data-position="top-right"] {
+  top: 1rem;
+  right: 1rem;
+}
+
+bwc-toast-region[data-position="bottom-left"] {
+  bottom: 1rem;
+  left: 1rem;
+}
+
+bwc-toast-region[data-position="bottom-center"] {
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+bwc-toast-region[data-position="bottom-right"] {
+  bottom: 1rem;
+  right: 1rem;
+}
+
+bwc-toast {
+  margin: 0;
+  background: inherit;
+}
+
+bwc-toast[data-limited] {
+  display: none;
+}

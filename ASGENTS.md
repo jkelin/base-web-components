@@ -15,7 +15,9 @@ No CDN in the repo: smoke CSS is local.
 ## Library layout
 
 - One folder per component under `src/`: `counter/`, `accordion/`, `modal/`,
-  `popover/`, `slide-out/`, `switch/`, `otp/`, `tabs/`. Shared code lives
+  `popover/`, `tooltip/`, `preview-card/`, `menu/`, `context-menu/`,
+  `select/`, `switch/`, `otp/`, `tabs/`, `slide-out/`, `alert-dialog/`,
+  `toast/`, `menubar/`, `navigation-menu/`. Shared code lives
   only in `src/shared/index.ts`; never cross-import between component folders.
 - Each folder owns colocated behavioral tests (`*.test.ts` next to the source).
   Tests assert observable behavior (rendered state, events, ARIA), never wiring.
@@ -72,8 +74,10 @@ No CDN in the repo: smoke CSS is local.
 
 ## Output contract
 
-- Eight entries, no aggregate root runtime: `counter`, `accordion`, `modal`,
-  `popover`, `slide-out`, `switch`, `otp`, `tabs` → `dist/<name>.js`
+- Seventeen entries, no aggregate root runtime: `counter`, `accordion`, `modal`,
+  `popover`, `tooltip`, `preview-card`, `menu`, `context-menu`, `select`,
+  `switch`, `otp`, `tabs`, `slide-out`, `alert-dialog`, `toast`, `menubar`,
+  `navigation-menu` → `dist/<name>.js`
   (native-minified ES modules, ES2022) plus one `shared.js` chunk carrying
   shared helpers and the single microfw/alien runtime copy.
   `sideEffects` preserves self-registration.
@@ -100,3 +104,8 @@ No CDN in the repo: smoke CSS is local.
 - Shell UI icons are Phosphor icons (https://phosphoricons.com), duotone
   weight, inlined as SVG from `website/src/icons.ts` (official duotone
   paths, no emoji). Reuse that module for new shell icons; never add emoji icons.
+- Every new component MUST be added to the website (demo page + registry + sidebar) in the same change. The only exception is the counter component, which is a test component.
+- Website component demos MUST get component visuals from the imported
+  `packages/basic-web-components/src/theme.css` through `bwc-*` and native
+  part/data selectors. Demo classes stay limited to layout; the
+  `data-bwc-unstyled` escape remains valid.

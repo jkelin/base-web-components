@@ -85,6 +85,22 @@ export function booleanProp(attribute: string): PropOptions<boolean> & { attribu
   };
 }
 
+/**
+ * Boolean prop defaulting to true when the attribute is absent.
+ * `attr="false"` opts out; presence (or any other value) means true.
+ */
+export function booleanPropDefaultTrue(
+  attribute: string,
+): PropOptions<boolean> & { attribute: string } {
+  return {
+    attribute,
+    defaultValue: true,
+    fromAttribute: (raw: string | null) => raw === null || raw !== "false",
+    fromProperty: (raw: unknown) => booleanValue(raw, attribute),
+    toAttribute: (value: boolean) => (value ? "" : "false"),
+  };
+}
+
 export function stringProp(
   attribute: string,
   defaultValue = "",

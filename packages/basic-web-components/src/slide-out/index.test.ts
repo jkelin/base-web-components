@@ -96,6 +96,23 @@ describe("state and dismissal", () => {
     expect(root.open).toBe(false);
     expect(seen).toEqual([true, false]);
   });
+  it("applies methods and property writes after uncontrolled transitions", () => {
+    const { panel, root, trigger } = createSlideOut();
+    const callback = vi.fn();
+    root.onOpenChange = callback;
+    document.body.append(root);
+
+    trigger.click();
+    root.open = false;
+    expect(root.open).toBe(false);
+    expect(panel.hasAttribute("data-closed")).toBe(true);
+
+    root.show();
+    expect(root.open).toBe(true);
+    root.toggle();
+    expect(root.open).toBe(false);
+    expect(callback.mock.calls).toEqual([[true], [false], [true], [false]]);
+  });
 
   it("closes from the inner close button", () => {
     const { close, root, trigger } = createSlideOut();

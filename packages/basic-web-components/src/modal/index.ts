@@ -14,7 +14,7 @@ import {
   toggleState,
   type ChangeCallback,
 } from "../shared";
-
+import { acquireScrollLock, releaseScrollLock } from "../floating";
 export type BwcModalElement = HTMLElement & {
   open: boolean;
   defaultOpen: boolean;
@@ -23,35 +23,13 @@ export type BwcModalElement = HTMLElement & {
   popupClass: string;
   closeClass: string;
   onOpenChange: ChangeCallback<boolean>;
+  /** Imperative open. Respects `disabled`; applies and notifies in controlled mode. */
+  show: () => void;
+  /** Imperative close. Applies and notifies in controlled mode. */
+  close: () => void;
+  /** Toggle, or force with a boolean. Applies and notifies in controlled mode. */
+  toggle: (force?: boolean) => void;
 };
-
-type DocumentScrollLock = {
-  owners: Set<HTMLElement>;
-  overflow: string;
-};
-
-const documentScrollLocks = new WeakMap<Document, DocumentScrollLock>();
-
-function acquireDocumentScrollLock(document: Document, owner: HTMLElement): void {
-  let lock = documentScrollLocks.get(document);
-  if (!lock) {
-    lock = { owners: new Set(), overflow: document.documentElement.style.overflow };
-    document.documentElement.style.overflow = "hidden";
-    documentScrollLocks.set(document, lock);
-  }
-  lock.owners.add(owner);
-}
-
-function releaseDocumentScrollLock(document: Document, owner: HTMLElement): void {
-  const lock = documentScrollLocks.get(document);
-  if (!lock || !lock.owners.delete(owner) || lock.owners.size > 0) return;
-
-  try {
-    document.documentElement.style.overflow = lock.overflow;
-  } finally {
-    documentScrollLocks.delete(document);
-  }
-}
 
 export const BwcModalElement = defineComponent<BwcModalElement>("bwc-modal", () => {
   const host = useHost<BwcModalElement>();
@@ -71,7 +49,7 @@ export const BwcModalElement = defineComponent<BwcModalElement>("bwc-modal", () 
   let initialized = false;
   let activeDialog: HTMLDialogElement | null = null;
   let restoreFocus: HTMLElement | null = null;
-  let lockedDocument: Document | null = null;
+  let scrollHeld = false;
   const classControllers = new WeakMap<HTMLElement, (partClass?: string | null) => void>();
 
   const open = useProp<boolean>("open", {
@@ -79,6 +57,7 @@ export const BwcModalElement = defineComponent<BwcModalElement>("bwc-modal", () 
     get: () => openState(),
     onSet: (value, commit) => {
       controlled = true;
+      if (initialized) requestOpen(value, true);
       commit(value);
     },
   });
@@ -103,17 +82,20 @@ export const BwcModalElement = defineComponent<BwcModalElement>("bwc-modal", () 
   };
 
   const syncScrollLock = (dialog: HTMLDialogElement | null) => {
-    const nextDocument = dialog?.open && host.isConnected ? dialog.ownerDocument : null;
-    if (lockedDocument === nextDocument) return;
-    if (lockedDocument) releaseDocumentScrollLock(lockedDocument, host);
-    if (nextDocument) acquireDocumentScrollLock(nextDocument, host);
-    lockedDocument = nextDocument;
+    const wantLock = Boolean(dialog?.open && host.isConnected);
+    if (wantLock && !scrollHeld) {
+      scrollHeld = true;
+      acquireScrollLock(host);
+    } else if (!wantLock && scrollHeld) {
+      scrollHeld = false;
+      releaseScrollLock(host);
+    }
   };
 
-  const requestOpen = (next: boolean) => {
-    if (disabled() || next === openState()) return;
+  const requestOpen = (next: boolean, force = false) => {
+    if ((!force && disabled()) || next === openState()) return;
     emit(host, onOpenChange(), "open-change", "open", next);
-    if (controlled) return;
+    if (controlled && !force) return;
 
     try {
       openState(next);
@@ -122,6 +104,17 @@ export const BwcModalElement = defineComponent<BwcModalElement>("bwc-modal", () 
       syncScrollLock(null);
       throw error;
     }
+  };
+
+  host.show = () => {
+    if (!disabled()) requestOpen(true, true);
+  };
+  host.close = () => {
+    if (!disabled()) requestOpen(false, true);
+  };
+  host.toggle = (force?: boolean) => {
+    if (disabled()) return;
+    requestOpen(typeof force === "boolean" ? force : !openState(), true);
   };
 
   onMount(() => {

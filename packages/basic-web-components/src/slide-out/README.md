@@ -87,3 +87,10 @@ Exactly one trigger button and one panel are required; the component throws
 otherwise. Missing `id`/`data-testid` values are generated
 (`bwc-slide-out-trigger`, `bwc-slide-out-panel`, `bwc-slide-out-close`,
 `bwc-slide-out-overlay`); author values survive upgrades.
+
+### Imperative state
+
+Assigning `open` permanently enters controlled mode. Property assignments and
+`show()` / `close()` / `toggle()` apply immediately and emit `open-change`
+when the effective state changes; other interactions only request changes in
+controlled mode.

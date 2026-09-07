@@ -16,8 +16,17 @@ Uncontrolled:
 <bwc-modal>
   <button slot="trigger">Open</button>
   <dialog slot="popup">
-    <p>Confirm?</p>
-    <button data-close>Close</button>
+    <header data-modal-header>
+      <h2 data-title>Confirm changes?</h2>
+      <button data-close title="Close">×</button>
+    </header>
+    <div data-modal-content>
+      <p data-description>Review the changes before continuing.</p>
+    </div>
+    <div data-modal-actions>
+      <button data-close>Cancel</button>
+      <button data-action data-close>Confirm</button>
+    </div>
   </dialog>
 </bwc-modal>
 ```
@@ -96,3 +105,11 @@ None (dialog content participates normally if you put a `<form>` inside).
 
 - `TypeError` when the trigger/popup topology is invalid.
 - `TypeError` when `onOpenChange` is a non-function, non-null value.
+
+### State ownership
+
+Without `open`, interactions update internal state seeded by `default-open`.
+Assigning `open` permanently enters controlled mode. Property assignments and
+`show()` / `close()` / `toggle()` apply immediately and emit `open-change`
+when the effective state changes; other interactions only request changes in
+controlled mode.

@@ -7,10 +7,19 @@ const entries = {
   accordion: "src/accordion/index.ts",
   modal: "src/modal/index.ts",
   popover: "src/popover/index.ts",
+  tooltip: "src/tooltip/index.ts",
+  "preview-card": "src/preview-card/index.ts",
+  menu: "src/menu/index.ts",
+  "context-menu": "src/context-menu/index.ts",
+  select: "src/select/index.ts",
   switch: "src/switch/index.ts",
   otp: "src/otp/index.ts",
   tabs: "src/tabs/index.ts",
   "slide-out": "src/slide-out/index.ts",
+  "alert-dialog": "src/alert-dialog/index.ts",
+  toast: "src/toast/index.ts",
+  menubar: "src/menubar/index.ts",
+  "navigation-menu": "src/navigation-menu/index.ts",
 };
 
 export default defineConfig({

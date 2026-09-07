@@ -14,19 +14,46 @@
     "./src/modal/index.ts",
     "./src/popover/index.ts",
     "./src/popover/popover.css",
+    "./src/tooltip/index.ts",
+    "./src/tooltip/tooltip.css",
+    "./src/preview-card/index.ts",
+    "./src/preview-card/preview-card.css",
+    "./src/menu/index.ts",
+    "./src/menu/menu.css",
+    "./src/context-menu/index.ts",
+    "./src/context-menu/context-menu.css",
+    "./src/select/index.ts",
+    "./src/select/select.css",
     "./src/switch/index.ts",
     "./src/otp/index.ts",
     "./src/tabs/index.ts",
     "./src/slide-out/index.ts",
     "./src/slide-out/slide-out.css",
+    "./src/alert-dialog/index.ts",
+    "./src/alert-dialog/alert-dialog.css",
+    "./src/toast/index.ts",
+    "./src/toast/toast.css",
+    "./src/menubar/index.ts",
+    "./src/menubar/menubar.css",
+    "./src/navigation-menu/index.ts",
+    "./src/navigation-menu/navigation-menu.css",
     "./dist/counter.js",
     "./dist/accordion.js",
     "./dist/modal.js",
     "./dist/popover.js",
+    "./dist/tooltip.js",
+    "./dist/preview-card.js",
+    "./dist/menu.js",
+    "./dist/context-menu.js",
+    "./dist/select.js",
     "./dist/switch.js",
     "./dist/otp.js",
     "./dist/tabs.js",
-    "./dist/slide-out.js"
+    "./dist/slide-out.js",
+    "./dist/alert-dialog.js",
+    "./dist/toast.js",
+    "./dist/menubar.js",
+    "./dist/navigation-menu.js"
   ],
   "exports": {
     "./counter": {
@@ -57,6 +84,41 @@
       "import": "./dist/popover.js",
       "default": "./dist/popover.js"
     },
+    "./tooltip": {
+      "types": "./src/tooltip/index.ts",
+      "source": "./src/tooltip/index.ts",
+      "development": "./src/tooltip/index.ts",
+      "import": "./dist/tooltip.js",
+      "default": "./dist/tooltip.js"
+    },
+    "./preview-card": {
+      "types": "./src/preview-card/index.ts",
+      "source": "./src/preview-card/index.ts",
+      "development": "./src/preview-card/index.ts",
+      "import": "./dist/preview-card.js",
+      "default": "./dist/preview-card.js"
+    },
+    "./menu": {
+      "types": "./src/menu/index.ts",
+      "source": "./src/menu/index.ts",
+      "development": "./src/menu/index.ts",
+      "import": "./dist/menu.js",
+      "default": "./dist/menu.js"
+    },
+    "./context-menu": {
+      "types": "./src/context-menu/index.ts",
+      "source": "./src/context-menu/index.ts",
+      "development": "./src/context-menu/index.ts",
+      "import": "./dist/context-menu.js",
+      "default": "./dist/context-menu.js"
+    },
+    "./select": {
+      "types": "./src/select/index.ts",
+      "source": "./src/select/index.ts",
+      "development": "./src/select/index.ts",
+      "import": "./dist/select.js",
+      "default": "./dist/select.js"
+    },
     "./switch": {
       "types": "./src/switch/index.ts",
       "source": "./src/switch/index.ts",
@@ -84,6 +146,34 @@
       "development": "./src/slide-out/index.ts",
       "import": "./dist/slide-out.js",
       "default": "./dist/slide-out.js"
+    },
+    "./alert-dialog": {
+      "types": "./src/alert-dialog/index.ts",
+      "source": "./src/alert-dialog/index.ts",
+      "development": "./src/alert-dialog/index.ts",
+      "import": "./dist/alert-dialog.js",
+      "default": "./dist/alert-dialog.js"
+    },
+    "./toast": {
+      "types": "./src/toast/index.ts",
+      "source": "./src/toast/index.ts",
+      "development": "./src/toast/index.ts",
+      "import": "./dist/toast.js",
+      "default": "./dist/toast.js"
+    },
+    "./menubar": {
+      "types": "./src/menubar/index.ts",
+      "source": "./src/menubar/index.ts",
+      "development": "./src/menubar/index.ts",
+      "import": "./dist/menubar.js",
+      "default": "./dist/menubar.js"
+    },
+    "./navigation-menu": {
+      "types": "./src/navigation-menu/index.ts",
+      "source": "./src/navigation-menu/index.ts",
+      "development": "./src/navigation-menu/index.ts",
+      "import": "./dist/navigation-menu.js",
+      "default": "./dist/navigation-menu.js"
     },
     "./theme.css": "./src/theme.css"
   },

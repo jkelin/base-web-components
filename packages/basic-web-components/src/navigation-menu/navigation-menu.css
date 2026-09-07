@@ -1,0 +1,12 @@
+/*
+ * Styling for bwc-navigation-menu panels (light-DOM `div[data-nav-panel]`).
+ *
+ * Geometry comes from the shared floating core (see ../floating/): JS writes
+ * `position`/`left`/`top` inline plus `data-side` (placed side, after flip)
+ * and `data-align`. This file only owns component-specific resets; the shared
+ * floating stylesheet owns `[data-floating-arrow]` geometry.
+ */
+
+bwc-navigation-menu > [data-nav-panel] {
+  margin: 0;
+}

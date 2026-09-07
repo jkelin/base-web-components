@@ -89,8 +89,21 @@ describe("state and native dismissal", () => {
     expect(root.open).toBe(false);
     expect(callback.mock.calls).toEqual([[true], [false]]);
   });
+  it("applies a property write after an uncontrolled trigger transition", () => {
+    const { popup, root, trigger } = createModal();
+    const callback = vi.fn();
+    root.onOpenChange = callback;
+    document.body.append(root);
 
-  it("notifies controlled interactions without changing state until the attribute changes", async () => {
+    trigger.click();
+    root.open = false;
+
+    expect(root.open).toBe(false);
+    expect(popup.open).toBe(false);
+    expect(callback.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("applies imperative writes in controlled mode and keeps interaction requests controlled", () => {
     const { close, popup, root, trigger } = createModal({ open: true });
     const callback = vi.fn();
     root.onOpenChange = callback;
@@ -100,17 +113,17 @@ describe("state and native dismissal", () => {
     });
     document.body.append(root);
 
-    close.click();
-    expect(root.open).toBe(true);
-    expect(popup.open).toBe(true);
+    root.close();
+    expect(root.open).toBe(false);
+    expect(popup.open).toBe(false);
     expect(callback).toHaveBeenCalledWith(false);
     expect(changes).toEqual([false]);
 
-    root.removeAttribute("open");
-    await vi.waitFor(() => expect(root.open).toBe(false));
-    expect(popup.open).toBe(false);
     trigger.click();
     expect(root.open).toBe(false);
+    expect(changes).toEqual([false, true]);
+    close.click();
+    expect(changes).toEqual([false, true]);
   });
 
   it("handles cancel and backdrop dismissal and restores trigger focus", () => {

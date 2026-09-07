@@ -153,10 +153,13 @@ function wrapTables(html: string): string {
 const THEME_INIT = `<script>(function(){try{var t=localStorage.getItem("bwc-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark");}}catch(e){}try{var v=localStorage.getItem("bwc-theme-vars");if(v){var o=JSON.parse(v);for(var k in o){document.documentElement.style.setProperty(k,o[k]);}}}catch(e){}})();</script>`;
 
 // Critical shell styles, inline before paint: page background (no white
-// flash in dark mode), pre-upgrade slide-out hiding, responsive
-// sidebar/hamburger visibility, and the 100ms content-only fade. Everything
-// else arrives via Tailwind; noscript keeps the sidebar usable.
-const CRITICAL_CSS = `<style>html{background-color:#fafaf9}html.dark{background-color:#0c0a09}#main{transition:opacity 100ms ease-out}@media (prefers-reduced-motion:reduce){#main{transition:none}}bwc-slide-out:not(:defined)>[slot="panel"]{display:none}@media (max-width:1023.5px){#sidebar{display:none}}@media (min-width:1024px){#site-menu{display:none}}</style>`;
+// flash in dark mode), pre-upgrade overlay hiding (light-DOM popup/panel
+// content stays in the prerendered DOM for no-JS readers but is hidden until
+// its host upgrades and owns visibility — same pattern as the slide-out
+// panel), responsive sidebar/hamburger visibility, and the 100ms
+// content-only fade. Everything else arrives via Tailwind; noscript keeps
+// the sidebar usable.
+const CRITICAL_CSS = `<style>html{background-color:#fafaf9}html.dark{background-color:#0c0a09}#main{transition:opacity 100ms ease-out}@media (prefers-reduced-motion:reduce){#main{transition:none}}bwc-slide-out:not(:defined)>[slot="panel"]{display:none}bwc-tooltip:not(:defined)>[slot="popup"]{display:none}bwc-menu:not(:defined)>[slot="popup"]{display:none}bwc-context-menu:not(:defined)>[slot="popup"]{display:none}bwc-select:not(:defined)>[slot="popup"]{display:none}bwc-preview-card:not(:defined)>[slot="popup"]{display:none}bwc-navigation-menu:not(:defined)>[data-nav-panel]{display:none}bwc-alert-dialog:not(:defined)>[slot="popup"]{display:none}bwc-toast-region:not(:defined)>bwc-toast{display:none}@media (max-width:1023.5px){#sidebar{display:none}}@media (min-width:1024px){#site-menu{display:none}}</style>`;
 const NOSCRIPT_CSS = `<noscript><style>#sidebar{display:block !important}#site-menu{display:none !important}</style></noscript>`;
 // Site logo: white lowercase `bwc` monospace wordmark on a black rounded
 // rect. Hand-authored (rect + text only, no editor metadata) so it stays
@@ -174,24 +177,27 @@ const HEADER_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOGO
 function sidebar(active: string): string {
   const link = (href: string, label: string, current: boolean, mono = false) =>
     `<li><a href="${href}" ${current ? 'aria-current="page" ' : ""}data-testid="nav-${href === "./" ? "overview" : href.replace("./", "").replace(".html", "")}" class="block rounded-md px-3 py-2 text-sm transition ${current ? "bg-stone-900 font-semibold text-white dark:bg-stone-100 dark:text-stone-900" : "text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"} ${mono ? "font-mono text-[13px]" : ""}">${label}</a></li>`;
-  const items = COMPONENTS.map((component) =>
-    link(
-      `./${component.slug}.html`,
-      `${component.title} · ${component.tag}`,
-      active === component.slug,
-      true,
-    ),
-  ).join("\n");
+  const renderGroup = (title: string, entries: typeof COMPONENTS) =>
+    `<p class="mt-6 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">${title}</p>
+  <ul class="mt-2 space-y-0.5">${entries.map((component) => link(`./${component.slug}.html`, `${component.title} · ${component.tag}`, active === component.slug, true)).join("\n")}</ul>`;
   return `<nav aria-label="Docs" class="min-w-0">
   <p class="px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Overview</p>
   <ul class="mt-2 space-y-0.5">
     ${link("./", "Overview", active === "index")}
     ${link("./styling.html", "Styling", active === "styling")}
   </ul>
-  <p class="mt-6 px-3 text-[11px] font-semibold tracking-[0.14em] text-stone-400 uppercase select-none dark:text-stone-500">Components</p>
-  <ul class="mt-2 space-y-0.5">
-    ${items}
-  </ul>
+  ${renderGroup(
+    "Components",
+    COMPONENTS.filter((component) => component.category === undefined),
+  )}
+  ${renderGroup(
+    "Popper",
+    COMPONENTS.filter((component) => component.category === "Popper"),
+  )}
+  ${renderGroup(
+    "Overlay",
+    COMPONENTS.filter((component) => component.category === "Overlay"),
+  )}
   </nav>`;
 }
 
@@ -286,18 +292,25 @@ ${options.scripts}</body>
 `;
 }
 
-function demoCard(
+const DEMO_SOURCE_ONLY_PATTERN = /<div data-demo-source-only="[^"]+"[^>]*>[\s\S]*?<\/div>/g;
+
+/** Removes website launch chrome from the developer-facing source pane. */
+export function stripDemoSourceOnly(demo: string): string {
+  return demo.replace(DEMO_SOURCE_ONLY_PATTERN, "");
+}
+
+export function demoCard(
   slug: string,
   tag: string,
   demo: string,
   demoCode: string,
-  readoutInitial: string,
+  readoutInitial?: string,
 ): string {
-  // Preview/Code toggle: two native buttons (keyboard accessible) flipping
-  // `hidden` on the panes, so the live demo keeps its DOM state when
-  // switching back. The code pane shows the stripped example source (ids,
-  // testids, and classes removed) as raw escaped text, highlighted on the
-  // client with microlighter. `demo` stays full markup for the live preview.
+  const previewDemo = demo;
+  const readout =
+    readoutInitial === undefined
+      ? ""
+      : `<div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="${slug}" data-testid="demo-${slug}-readout">${escapeHtml(readoutInitial)}</span></div>`;
   return `<section aria-label="Live example" class="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5 dark:border-stone-800">
     <p class="text-xs font-semibold tracking-[0.12em] text-stone-500 uppercase select-none dark:text-stone-400">Live example</p>
@@ -306,9 +319,9 @@ function demoCard(
       <button type="button" id="demo-${slug}-toggle-code" data-testid="demo-${slug}-toggle-code" data-demo-toggle="${slug}" data-demo-view="code" aria-pressed="false" aria-controls="demo-${slug}-preview demo-${slug}-code" class="demo-toggle">Code</button>
     </div>
   </div>
-  <div id="demo-${slug}-preview" data-testid="demo-${slug}-preview" data-demo-pane="${slug}" data-demo-pane-view="preview" class="p-4 sm:p-5">${demo}</div>
+  <div id="demo-${slug}-preview" data-testid="demo-${slug}-preview" data-demo-pane="${slug}" data-demo-pane-view="preview" class="p-4">${previewDemo}</div>
   <div id="demo-${slug}-code" data-testid="demo-${slug}-code" data-demo-pane="${slug}" data-demo-pane-view="code" data-syntax-theme="github" class="demo-code" hidden>${demoCode}</div>
-  <div class="border-t border-stone-200 px-4 py-2.5 font-mono text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">demo state: <span data-readout="${slug}" data-testid="demo-${slug}-readout">${escapeHtml(readoutInitial)}</span></div>
+  ${readout}
 </section>`;
 }
 
@@ -464,8 +477,9 @@ async function generateSite(): Promise<GeneratedSite> {
     marked.use({ renderer: createRenderer() });
     const html = wrapTables(marked.parse(doc.markdown, { async: false }));
     marked.use({ renderer: null });
-    // Code pane shows the stripped example source; the preview keeps `demo` verbatim.
-    const exampleSource = stripExampleAttributes(component.demo);
+    // Website-only toast launchers exercise showToast() in the preview but do
+    // not obscure the concise declarative component example in the Code pane.
+    const exampleSource = stripExampleAttributes(stripDemoSourceOnly(component.demo));
     const demoCode = codeBlock(exampleSource, "html");
     overviewDemos.set(component.slug, demoCode);
     const size = await componentSize(component.slug);

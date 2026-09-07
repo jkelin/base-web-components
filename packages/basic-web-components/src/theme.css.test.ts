@@ -54,6 +54,9 @@ describe("theme selectors", () => {
       'bwc-popover \\[slot="trigger"\\]',
       'bwc-popover \\[slot="popup"\\]',
       "bwc-popover \\[data-close\\]",
+      'bwc-tooltip \\[slot="popup"\\]',
+      'bwc-alert-dialog \\[slot="popup"\\]',
+      "bwc-toast:not",
       'bwc-accordion details\\[slot="item"\\]',
       'bwc-accordion\\s+details\\[slot="item"\\]:not\\(\\[data-bwc-unstyled\\]\\)\\s*>\\s*summary',
       'bwc-tabs\\s+\\[slot="list"\\]:not\\(\\[data-bwc-unstyled\\]\\)\\s+button',
@@ -80,6 +83,15 @@ describe("theme selectors", () => {
       /background:\s*var\(--bwc-background\)/,
     );
     expect(ruleBody('bwc-popover \\[slot="popup"\\]:not\\(\\[data-bwc-unstyled\\]\\)')).toMatch(
+      /background:\s*var\(--bwc-background\)/,
+    );
+    expect(ruleBody('bwc-tooltip \\[slot="popup"\\]:not\\(\\[data-bwc-unstyled\\]\\)')).toMatch(
+      /background:\s*var\(--bwc-background\)/,
+    );
+    expect(
+      ruleBody('bwc-alert-dialog \\[slot="popup"\\]:not\\(\\[data-bwc-unstyled\\]\\)'),
+    ).toMatch(/background:\s*var\(--bwc-background\)/);
+    expect(ruleBody("bwc-toast:not\\(\\[data-bwc-unstyled\\]\\)")).toMatch(
       /background:\s*var\(--bwc-background\)/,
     );
     expect(ruleBody('bwc-tabs \\[slot="panel"\\]:not\\(\\[data-bwc-unstyled\\]\\)')).toMatch(
@@ -109,17 +121,17 @@ describe("unstyled opt-out", () => {
   // utilities in cascade layers while theme.css is unlayered, and unlayered
   // CSS beats layered CSS at any specificity — only `:not()` exclusion is
   // order/layer-independent.
-  it("guards every slot, close-button, and switch subject with :not([data-bwc-unstyled])", () => {
+  it("guards every author surface, close-button, and switch subject with :not([data-bwc-unstyled])", () => {
     for (const chunk of css.split("}")) {
       const head = (chunk.split("{")[0] ?? "").trim();
       if (head === "" || head === ".dark" || head.startsWith(":root") || head.startsWith("@")) {
         continue;
       }
-      for (const selector of head.split(",")) {
+      for (const selector of head.split(/,(?![^(]*\))/)) {
         const text = selector.trim();
         if (text === "") continue;
-        if (/\[slot=|\[data-close\]|bwc-switch button/.test(text)) {
-          expect(text).toContain(":not([data-bwc-unstyled])");
+        if (/\[slot=|\[data-nav-panel\]|\[data-close\]|bwc-switch button/.test(text)) {
+          expect(text).toMatch(/:not\([^)]*\[data-bwc-unstyled\][^)]*\)/);
         }
       }
     }
@@ -139,5 +151,51 @@ describe("accordion summary row", () => {
     expect(body).toMatch(/box-sizing:\s*border-box/);
     expect(body).not.toMatch(/list-style:\s*none/);
     expect(css).not.toMatch(/marker[^}]*display:\s*none/);
+  });
+});
+
+describe("dialog, toast, and navigation polish", () => {
+  it("shares section structure and 1.5rem header closes across dialogs", () => {
+    for (const hook of ["modal", "alert"]) {
+      expect(css).toMatch(
+        new RegExp(
+          `bwc-${hook === "modal" ? "modal" : "alert-dialog"} \\[data-${hook}-header\\][\\s\\S]*?justify-content:\\s*space-between`,
+        ),
+      );
+      expect(css).toMatch(
+        new RegExp(
+          `bwc-${hook === "modal" ? "modal" : "alert-dialog"} \\[data-${hook}-content\\][\\s\\S]*?padding:\\s*1rem`,
+        ),
+      );
+      expect(css).toMatch(
+        new RegExp(
+          `bwc-${hook === "modal" ? "modal" : "alert-dialog"} \\[data-${hook}-actions\\][\\s\\S]*?justify-content:\\s*flex-end`,
+        ),
+      );
+    }
+    const compactClose = ruleBody(
+      "bwc-modal \\[data-modal-header\\]:not\\(\\[data-bwc-unstyled\\]\\)[\\s\\S]*?bwc-toast \\[data-toast-header\\]:not\\(\\[data-bwc-unstyled\\]\\) \\[data-close\\]:not\\(\\[data-bwc-unstyled\\]\\)",
+    );
+    expect(compactClose).toMatch(/width:\s*1\.5rem/);
+    expect(compactClose).toMatch(/height:\s*1\.5rem/);
+  });
+
+  it("gives toast a responsive practical width and a heading row", () => {
+    const toast = ruleBody("bwc-toast:not\\(\\[data-bwc-unstyled\\]\\)");
+    expect(toast).toMatch(/min-width:\s*min\(20rem/);
+    expect(toast).toMatch(/max-width:\s*min\(24rem/);
+    const header = ruleBody("bwc-toast \\[data-toast-header\\]:not\\(\\[data-bwc-unstyled\\]\\)");
+    expect(header).toMatch(/display:\s*flex/);
+    expect(header).toMatch(/justify-content:\s*space-between/);
+  });
+
+  it("keeps navigation triggers compact and panel links structured", () => {
+    const trigger = ruleBody(
+      "bwc-navigation-menu \\[data-nav-trigger\\]:not\\(\\[data-bwc-unstyled\\]\\)",
+    );
+    expect(trigger).toMatch(/min-height:\s*2rem/);
+    expect(trigger).not.toMatch(/min-width:\s*10rem/);
+    expect(css).toMatch(/bwc-navigation-menu[^}]*\[data-open\]/);
+    expect(css).toMatch(/bwc-navigation-menu > \[data-nav-panel\][\s\S]*?a:not/);
   });
 });
